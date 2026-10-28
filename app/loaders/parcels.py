@@ -15,7 +15,7 @@ from app.config.sources import Source
 from app.database.guard import StagingGuardError, check_schema
 from app.database.session import prepare
 from app.extractors.av_file import Extract
-from app.transformers.parcels import Result
+from app.transformers.parcels import Result, grundstueck
 
 BATCH = 1000
 UPDATABLE = (
@@ -192,7 +192,7 @@ def load(engine: Engine, schema: str, table: str, result: Result, extract: Extra
 
 
 def _drop_egrid_clashes(conn, parcels, rows: list[dict], result: Result) -> list[dict]:
-    """An EGRID already stored under another parcel key is a conflict, not an update."""
+    """An EGRID already stored for another land register parcel is a conflict, not an update."""
     egrids = [r["egrid"] for r in rows if r["egrid"]]
     if not egrids:
         return rows
@@ -206,7 +206,7 @@ def _drop_egrid_clashes(conn, parcels, rows: list[dict], result: Result) -> list
     keep = []
     for r in rows:
         owner = taken.get(r["egrid"]) if r["egrid"] else None
-        if owner and owner != (r["canton"], r["nbident"], r["parcel_number"]):
+        if owner and grundstueck(*owner) != grundstueck(r["canton"], r["nbident"], r["parcel_number"]):
             result.rejected.append(
                 {
                     "canton": r["canton"],

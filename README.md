@@ -73,7 +73,7 @@ The database tests create and drop their own schema `iris_staging_test`.
 | `municipality` | `mbsf.Name` | point inside the parcel |
 | `nbident` | `resf.NBIdent` (DM.01 `Grundstueck.NBIdent`) | numbering area, starts with the canton code |
 | `parcel_number` | `resf.Nummer` | |
-| `egrid` | `resf.EGRIS_EGRID` | national id `CH` + 12 characters, unique, optional |
+| `egrid` | `resf.EGRIS_EGRID` | national id `CH` + 12 characters, optional; one land register parcel each (see below) |
 | `parcel_type` | configuration | `Liegenschaft`; the layer has no `Art` column |
 | `completeness`, `validity` | `Vollstaendigkeit`, `Gueltigkeit` | as delivered |
 | `area_source_m2` | `resf.Flaeche` | the legal area |
@@ -103,7 +103,7 @@ GeoPackage is flat: the layer `resf` holds geometry and Grundstueck attributes t
 | identical copy | stored once, the copy recorded as `exact_duplicate` |
 | same key, several separate polygons, same attributes | merged into one MultiPolygon, areas summed (`multipart_parcel` warning) |
 | same key, different content or overlapping parts | all copies held back: `conflicting_duplicate` |
-| same EGRID on two keys | `duplicate_egrid`, or `egrid_already_stored` across runs |
+| same EGRID on two land register parcels | `duplicate_egrid`, or `egrid_already_stored` across runs; numbered parts `<article>.<nn>` of one parcel (Fribourg) may share it |
 | canton attribute differs | rejected: `canton_mismatch` |
 | CRS missing | taken from the configuration, logged |
 | LV03 data | reprojected to LV95, logged |
@@ -123,7 +123,10 @@ canton and file, to `logs/ingest.jsonl`.
 `python main.py report` builds [docs/quality_report.md](docs/quality_report.md) and
 `results/summary.json` and `results/sample_parcels.csv` from the database: coverage per canton,
 integrity checks, rejected records by reason, runs and sample rows. `sql/validation.sql` holds the
-acceptance checks (valid geometries, SRIDs, unique keys and EGRIDs, provenance, location).
+acceptance checks (valid geometries, SRIDs, unique keys, one parcel per EGRID, provenance,
+location). `sql/examples.sql` has example queries (parcel under a point, coverage per
+municipality) and the queries behind the findings in the quality report:
+`docker compose exec -T db psql -U iris -d iris_staging < sql/examples.sql`.
 
 ## Assumptions and limitations
 

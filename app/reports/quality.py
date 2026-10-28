@@ -19,8 +19,8 @@ REASONS = {
     "invalid_geometry": "invalid polygon that could not be repaired within tolerance",
     "exact_duplicate": "identical copy of another feature, kept once",
     "conflicting_duplicate": "same parcel key with different content, all copies held back",
-    "duplicate_egrid": "same EGRID on different parcel keys in one file",
-    "egrid_already_stored": "EGRID already stored for a different parcel",
+    "duplicate_egrid": "same EGRID on different land register parcels in one file",
+    "egrid_already_stored": "EGRID already stored for a different land register parcel",
     "canton_mismatch": "canton attribute differs from the configured canton",
 }
 
@@ -53,7 +53,9 @@ def gather(engine: Engine, schema: str, table: str) -> dict:
                 count(*) FILTER (WHERE ST_SRID(geom) <> 2056 OR ST_SRID(geom_wgs84) <> 4326) AS wrong_srid,
                 count(*) FILTER (WHERE ST_IsEmpty(geom)) AS empty_geometries,
                 count(*) - count(DISTINCT (canton, nbident, parcel_number)) AS duplicate_keys,
-                count(egrid) - count(DISTINCT egrid) AS duplicate_egrids,
+                (SELECT count(*) FROM (SELECT egrid FROM "{s}".{t} WHERE egrid IS NOT NULL GROUP BY egrid
+                    HAVING count(DISTINCT (canton, nbident, split_part(parcel_number, '.', 1))) > 1) e)
+                    AS egrids_on_two_parcels,
                 count(*) FILTER (WHERE country <> 'CH') AS wrong_country
                 FROM "{s}".{t}"""),
             # five parcels per canton, picked by EGRID so the sample is spread over the canton

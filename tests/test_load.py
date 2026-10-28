@@ -138,3 +138,14 @@ def test_parcel_missing_from_a_new_file_is_counted_not_deleted(eng, tmp_gpkg, tm
     assert (stats.unchanged, stats.not_in_source) == (4, 1)
     assert count(eng, "SELECT count(*) FROM S.cadastre_switzerland") == 5
     assert count(eng, "SELECT not_in_source FROM S.ingestion_runs ORDER BY started_at DESC LIMIT 1") == 1
+
+
+def test_a_new_part_of_a_stored_parcel_may_reuse_its_egrid(eng, tmp_gpkg, tmp_path, settings, source):
+    rows = fixtures.parcels(2)
+    rows[0].update(Nummer="2007.03101", EGRIS_EGRID="CH999900002007")
+    fixtures.write(tmp_gpkg, rows[:1])
+    ingest(eng, tmp_gpkg, settings, source, layer="Liegenschaften_Liegenschaft")
+    rows[1].update(Nummer="2007.03102", EGRIS_EGRID="CH999900002007")
+    later = fixtures.write(tmp_path / "later.gpkg", rows)
+    stats = ingest(eng, later, settings, source, layer="Liegenschaften_Liegenschaft")
+    assert (stats.inserted, stats.unchanged, stats.rejected) == (1, 1, 0)

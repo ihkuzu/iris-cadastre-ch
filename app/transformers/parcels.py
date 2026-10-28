@@ -124,6 +124,13 @@ HASHED = (
     "source_dataset_date",
     "source_attributes",
 )
+
+
+def grundstueck(canton: str, nbident: str, number: str) -> tuple[str, str, str]:
+    """The land register parcel a row belongs to: Fribourg numbers its parts as <article>.<part>."""
+    return canton, nbident, number.split(".", 1)[0]
+
+
 SAME_PARCEL = ("egrid", "bfs_nr", "parcel_type", "completeness", "validity")
 
 
@@ -315,15 +322,20 @@ def _dedupe(candidates, out: Result) -> None:
             out.warnings["multipart_parcel"] += 1
             unique = [merged]
         kept.append(unique[0])
-    owners: dict[str, int] = defaultdict(int)
+    # one EGRID may cover several numbered parts of the same land register parcel, nothing else
+    owners: dict[str, set] = defaultdict(set)
+    keys: dict[str, int] = defaultdict(int)
     for row, _, _ in kept:
         if row["egrid"]:
-            owners[row["egrid"]] += 1
+            owners[row["egrid"]].add(grundstueck(row["canton"], row["nbident"], row["parcel_number"]))
+            keys[row["egrid"]] += 1
     final = []
     for row, poly, reject in kept:
-        if row["egrid"] and owners[row["egrid"]] > 1:
+        if row["egrid"] and len(owners[row["egrid"]]) > 1:
             out.rejected.append({**_wkt(reject), "reason": "duplicate_egrid", "detail": row["egrid"]})
             continue
+        if row["egrid"] and keys[row["egrid"]] > 1:
+            out.warnings["egrid_shared_by_parts"] += 1
         row["geom"] = poly
         row["record_hash"] = record_hash(row, poly.normalize().wkb)
         final.append(row)

@@ -183,3 +183,18 @@ def test_numpy_and_missing_values_are_stored_as_plain_json():
     assert _clean(np.bool_(True)) is True
     assert _clean(pd.NaT) is None
     assert _clean(np.int64(3)) == 3
+
+
+def test_numbered_parts_of_one_parcel_may_share_the_egrid(tmp_gpkg, settings, source):
+    # Fribourg numbers the parts of one land register parcel <article>.<nn> under one EGRID
+    rows = fixtures.parcels(4)
+    rows[0].update(Nummer="2007.03101", EGRIS_EGRID="CH999900002007")
+    rows[1].update(Nummer="2007.03102", EGRIS_EGRID="CH999900002007")
+    rows[2].update(Nummer="2008.00101", EGRIS_EGRID="CH999900002007")
+    fixtures.write(tmp_gpkg, rows)
+    out = run(tmp_gpkg, settings, source)
+    assert dict(out.reasons) == {"duplicate_egrid": 3}
+    rows[2].update(EGRIS_EGRID="CH999900002008")
+    fixtures.write(tmp_gpkg, rows)
+    out = run(tmp_gpkg, settings, source)
+    assert not out.rejected and out.warnings["egrid_shared_by_parts"] == 2

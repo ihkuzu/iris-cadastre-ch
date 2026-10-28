@@ -9,10 +9,13 @@ SELECT 'parcel keys are unique', count(*) - count(DISTINCT (canton, nbident, par
        count(*) = count(DISTINCT (canton, nbident, parcel_number))
   FROM iris_staging.cadastre_switzerland
 UNION ALL
-SELECT 'EGRIDs are unique and well formed', count(egrid) - count(DISTINCT egrid)
-       + count(*) FILTER (WHERE egrid IS NOT NULL AND egrid !~ '^CH[0-9A-Z]{12}$'),
-       count(egrid) = count(DISTINCT egrid) AND count(*) FILTER (WHERE egrid !~ '^CH[0-9A-Z]{12}$') = 0
-  FROM iris_staging.cadastre_switzerland
+SELECT 'EGRIDs are well formed', count(*), count(*) = 0
+  FROM iris_staging.cadastre_switzerland WHERE egrid !~ '^CH[0-9A-Z]{12}$'
+UNION ALL
+-- an EGRID may be shared only by the numbered parts <article>.<nn> of one land register parcel
+SELECT 'each EGRID belongs to one parcel', count(*), count(*) = 0
+  FROM (SELECT egrid FROM iris_staging.cadastre_switzerland WHERE egrid IS NOT NULL GROUP BY egrid
+        HAVING count(DISTINCT (canton, nbident, split_part(parcel_number, '.', 1))) > 1) e
 UNION ALL
 SELECT 'canton and country set', count(*), count(*) = 0
   FROM iris_staging.cadastre_switzerland WHERE canton IS NULL OR country <> 'CH'

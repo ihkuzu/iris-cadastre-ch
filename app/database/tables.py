@@ -64,7 +64,6 @@ def build(schema: str, table: str = "cadastre_switzerland") -> tuple[MetaData, d
         Column("first_seen_at", DateTime(timezone=True), nullable=False, server_default=text("now()")),
         Column("updated_at", DateTime(timezone=True), nullable=False, server_default=text("now()")),
         UniqueConstraint("canton", "nbident", "parcel_number", name=f"{table}_natural_key"),
-        UniqueConstraint("egrid", name=f"{table}_egrid_key"),
         CheckConstraint("country = 'CH'", name=f"{table}_country_ch"),
         CheckConstraint("egrid IS NULL OR egrid ~ '^CH[0-9A-Z]{12}$'", name=f"{table}_egrid_format"),
         CheckConstraint("area_m2 >= 0", name=f"{table}_area_positive"),
@@ -72,6 +71,8 @@ def build(schema: str, table: str = "cadastre_switzerland") -> tuple[MetaData, d
     Index(f"{table}_geom_idx", parcels.c.geom, postgresql_using="gist")
     Index(f"{table}_geom_wgs84_idx", parcels.c.geom_wgs84, postgresql_using="gist")
     Index(f"{table}_canton_bfs_idx", parcels.c.canton, parcels.c.bfs_nr)
+    # not unique: in Fribourg the parts <article>.<nn> of one parcel share its EGRID
+    Index(f"{table}_egrid_idx", parcels.c.egrid)
     runs = Table(
         "ingestion_runs",
         md,
