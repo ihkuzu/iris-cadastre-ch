@@ -98,3 +98,24 @@ def test_download_keeps_an_existing_file_and_refuses_an_order_page(env, monkeypa
     target.write_bytes(b"kept")
     assert main(["download", "AI"]) == 0 and target.read_bytes() == b"kept"
     assert "--force" in capsys.readouterr().out
+
+
+def test_download_network_error_leaves_no_partial_file(env, monkeypatch, capsys):
+    import urllib.error
+    import urllib.request
+
+    from app.config.settings import get_settings
+
+    def fail(*args, **kwargs):
+        raise urllib.error.URLError("no route")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    folder = get_settings().data_dir / "raw" / "AI"
+    assert main(["download", "AI"]) == 2
+    assert "download failed" in capsys.readouterr().out
+    assert not list(folder.glob("*")) if folder.exists() else True
+
+
+def test_closed_canton_is_refused_before_reading(env, capsys):
+    assert main(["ingest", "VD"]) == 2
+    assert "not open" in capsys.readouterr().out

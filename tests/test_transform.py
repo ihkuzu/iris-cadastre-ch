@@ -200,3 +200,18 @@ def test_numbered_parts_of_one_parcel_may_share_the_egrid(tmp_gpkg, settings, so
     assert not out.rejected and out.warnings["egrid_shared_by_parts"] == 2
     # without the canton setting, two numbers with one EGRID stay a conflict
     assert dict(run(tmp_gpkg, settings, source).reasons) == {"duplicate_egrid": 2}
+
+
+def test_zip_with_paths_outside_the_folder_or_broken_zip_is_refused(tmp_path):
+    import zipfile
+
+    evil = tmp_path / "evil.zip"
+    with zipfile.ZipFile(evil, "w") as zf:
+        zf.writestr("../outside.gpkg", b"x")
+    with pytest.raises(ValueError, match="unsafe path"):
+        av_file.unpack(evil)
+    assert not (tmp_path / "outside.gpkg").exists()
+    broken = tmp_path / "broken.zip"
+    broken.write_bytes(b"PK\x03\x04 not really a zip")
+    with pytest.raises(zipfile.BadZipFile):
+        av_file.unpack(broken)

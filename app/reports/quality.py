@@ -36,9 +36,10 @@ WARNINGS = {
 }
 
 
-def gather(engine: Engine, schema: str, table: str) -> dict:
+def gather(engine: Engine, schema: str, table: str, tol_m2: float = 1.0, tol_share: float = 0.005) -> dict:
     check_schema(schema)
-    q = lambda sql: [dict(r._mapping) for r in conn.execute(text(sql.format(s=schema, t=table)))]  # noqa: E731
+    tol = {"m2": float(tol_m2), "share": float(tol_share)}
+    q = lambda sql: [dict(r._mapping) for r in conn.execute(text(sql.format(s=schema, t=table)), tol)]  # noqa: E731
     with engine.connect() as conn:
         return {
             "generated": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -48,7 +49,7 @@ def gather(engine: Engine, schema: str, table: str) -> dict:
                 count(*) FILTER (WHERE geometry_repaired) AS repaired,
                 round(sum(area_m2) / 1e6, 2) AS area_km2,
                 count(*) FILTER (WHERE area_source_m2 IS NOT NULL
-                    AND abs(area_m2 - area_source_m2) > greatest(1, 0.005 * area_source_m2)) AS area_mismatch,
+                    AND abs(area_m2 - area_source_m2) > greatest(:m2, :share * area_source_m2)) AS area_mismatch,
                 min(source_dataset_date) AS dataset_date, max(licence) AS licence, max(source_crs) AS source_crs
                 FROM "{s}".{t} GROUP BY canton, canton_name ORDER BY canton"""),
             "runs": q("""SELECT run_id::text, canton, source_file, left(source_sha256, 12) AS sha256, status,
@@ -106,9 +107,9 @@ def write(data: dict, report: Path, results: Path, notes: Path | None = None) ->
     checks = data["checks"][0] if data["checks"] else {}
     ok = all(v == 0 for v in checks.values())
     lines = [
-        "# Quality report: Swiss cadastre (AV) ingestion\n",
-        f"Generated {data['generated']} from the staging tables.\n",
-        "## Coverage by canton\n",
+        "# Quality report: Swiss cadastre (AV) ingestion\n\n",
+        f"Generated {data['generated']} from the staging tables.\n\n",
+        "## Coverage by canton\n\n",
         _table(
             data["by_canton"],
             [
@@ -126,20 +127,20 @@ def write(data: dict, report: Path, results: Path, notes: Path | None = None) ->
                 "licence",
             ],
         ),
-        "\n## Integrity checks\n",
+        "\n## Integrity checks\n\n",
         f"All checks {'pass' if ok else 'do NOT pass'}.\n\n",
         _table([checks], list(checks)) if checks else "_none_\n",
-        "\n## Rejected records (latest successful run per canton)\n",
+        "\n## Rejected records (latest successful run per canton)\n\n",
         _table(
             [{**r, "meaning": REASONS.get(r["reason"], "")} for r in data["rejected"]],
             ["canton", "reason", "n", "meaning"],
         ),
-        "\n## Warnings (latest successful run per canton; rows are stored)\n",
+        "\n## Warnings (latest successful run per canton; rows are stored)\n\n",
         _table(
             [{**r, "meaning": WARNINGS.get(r["warning"], "")} for r in data["warnings"]],
             ["canton", "warning", "n", "meaning"],
         ),
-        "\n## Runs (times in UTC)\n",
+        "\n## Runs (times in UTC)\n\n",
         _table(
             data["runs"],
             [
@@ -157,7 +158,7 @@ def write(data: dict, report: Path, results: Path, notes: Path | None = None) ->
                 "repaired",
             ],
         ),
-        "\n## Sample rows\n",
+        "\n## Sample rows\n\n",
         _table(data["sample"], list(data["sample"][0]) if data["sample"] else []),
     ]
     if notes and notes.exists():

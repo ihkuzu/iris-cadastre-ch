@@ -20,6 +20,7 @@
   and is stored as one MultiPolygon with the summed area.
 - `source_dataset_date` is the layer's `last_change` in the GeoPackage, which is the export date
   of geodienste.ch, not the date of the last field survey.
+- Timestamps are stored in UTC; a source date or time without a zone is taken as UTC.
 - An unchanged parcel keeps the provenance (file, hash, run) of the run that last wrote it; a new
   run only updates `last_seen_run_id`. Parcels missing from a newer file are counted, not deleted.
 
@@ -34,8 +35,9 @@
   parcel's EGRID: 1,605 parts, 2 to 11 per EGRID, always within one NBIdent and article number.
   An earlier version of the rule rejected these as duplicate EGRIDs; FR is now configured with
   `egrid_parts = true`, which accepts parts of the same article. Other cantons keep the strict rule.
-- Fribourg: 2 features carry an EGRID that also belongs to a different article. They are held
-  back as `duplicate_egrid`, since an EGRID identifies exactly one parcel.
+- Fribourg: EGRID `CH349410860776` is on two different parcels of `FR213812` (municipality 2138),
+  numbers `1356` (1,121 m²) and `1817` (430 m²). An EGRID identifies exactly one parcel, so both
+  features are held back as `duplicate_egrid` instead of picking one.
 - Fribourg: parcel `FR213812/1058a` comes twice, in municipalities 2138 and 2163, with different
   geometry and stated area (10,434 m² and 225,600 m²). Both copies are held back as
   `conflicting_duplicate` for a person to resolve; they are not guessed.

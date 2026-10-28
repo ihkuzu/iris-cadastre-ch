@@ -135,7 +135,13 @@ def cmd_init(args, settings) -> int:
 
 
 def cmd_report(args, settings) -> int:
-    data = quality.gather(engine(settings.database_url), settings.db_schema, settings.table)
+    data = quality.gather(
+        engine(settings.database_url),
+        settings.db_schema,
+        settings.table,
+        settings.area_tolerance_m2,
+        settings.area_tolerance_share,
+    )
     notes = None if args.no_notes else ROOT / "docs" / "report_notes.md"
     quality.write(data, _root(args.out), _root(args.results), notes)
     print(f"wrote {args.out} and {args.results}/")

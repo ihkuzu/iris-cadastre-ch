@@ -152,3 +152,13 @@ def test_a_new_part_of_a_stored_parcel_may_reuse_its_egrid(eng, tmp_gpkg, tmp_pa
     later = fixtures.write(tmp_path / "later.gpkg", rows)
     stats = ingest(eng, later, settings, source, layer="Liegenschaften_Liegenschaft")
     assert (stats.inserted, stats.unchanged, stats.rejected) == (1, 1, 0)
+
+
+def test_an_egrid_may_move_to_another_parcel_in_a_new_file(eng, tmp_gpkg, tmp_path, settings, source):
+    rows = fixtures.parcels(2)
+    fixtures.write(tmp_gpkg, rows)
+    ingest(eng, tmp_gpkg, settings, source, layer="Liegenschaften_Liegenschaft")
+    rows[0]["EGRIS_EGRID"], rows[1]["EGRIS_EGRID"] = rows[1]["EGRIS_EGRID"], "CH999900009999"
+    later = fixtures.write(tmp_path / "later.gpkg", rows)
+    stats = ingest(eng, later, settings, source, layer="Liegenschaften_Liegenschaft")
+    assert (stats.updated, stats.rejected) == (2, 0)

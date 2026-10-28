@@ -203,6 +203,9 @@ def _drop_egrid_clashes(conn, parcels, rows: list[dict], result: Result, parts: 
     for i in range(0, len(egrids), 5000):
         for e, c, n, p in conn.execute(stmt, {"egrids": egrids[i : i + 5000]}):
             taken[e] = (c, n, p)
+    # a stored parcel that comes with another EGRID in this file gives its old EGRID up
+    now = {(r["canton"], r["nbident"], r["parcel_number"]): r["egrid"] for r in result.rows}
+    taken = {e: o for e, o in taken.items() if now.get(o, e) == e}
     keep = []
     for r in rows:
         owner = taken.get(r["egrid"]) if r["egrid"] else None
