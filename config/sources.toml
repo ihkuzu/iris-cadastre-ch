@@ -1,0 +1,49 @@
+# One entry per canton. Only "open" or "open-with-attribution" sources are ingested.
+# Sources: geodienste.ch offer "Amtliche Vermessung" (version 24.0, model DM.01-AV-CH),
+# per-canton access conditions from https://www.geodienste.ch/downloads/av and
+# https://www.geodienste.ch/info/services.csv?base_topics=av&language=de (checked 2026-10-28).
+# geodienste.ch asks for at most one download per dataset and day: keep the zip in data/raw.
+
+[source.AI]
+name = "Kanton Appenzell Innerrhoden, amtliche Vermessung via geodienste.ch"
+url = "https://www.geodienste.ch/downloads/geopackage/av/AI/deu/av_AI_gpkg_lv95.zip"
+file = "av_AI_gpkg_lv95.zip"
+licence = "Frei erhältlich, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)"
+licence_url = "https://www.geodienste.ch/terms-of-use"
+access = "open-with-attribution"
+native_crs = "EPSG:2056"
+
+[source.BS]
+name = "Kanton Basel-Stadt, amtliche Vermessung via geodienste.ch"
+url = "https://www.geodienste.ch/downloads/geopackage/av/BS/deu/av_BS_gpkg_lv95.zip"
+file = "av_BS_gpkg_lv95.zip"
+licence = "Frei erhältlich, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)"
+licence_url = "https://www.geodienste.ch/terms-of-use"
+access = "open-with-attribution"
+native_crs = "EPSG:2056"
+
+[source.GE]
+name = "République et canton de Genève, mensuration officielle via geodienste.ch"
+url = "https://www.geodienste.ch/downloads/geopackage/av/GE/deu/av_GE_gpkg_lv95.zip"
+file = "av_GE_gpkg_lv95.zip"
+licence = "Freie Nutzung, Quellenangabe Pflicht; SITG conditions d'utilisation"
+licence_url = "https://sitg.ge.ch/ressources/conditions-utilisation-donnees"
+access = "open-with-attribution"
+native_crs = "EPSG:2056"
+
+[source.FR]
+name = "Canton de Fribourg / Kanton Freiburg, amtliche Vermessung via geodienste.ch"
+url = "https://www.geodienste.ch/downloads/geopackage/av/FR/deu/av_FR_gpkg_lv95.zip"
+file = "av_FR_gpkg_lv95.zip"
+licence = "Freie Nutzung, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)"
+licence_url = "https://www.geodienste.ch/terms-of-use"
+access = "open-with-attribution"
+native_crs = "EPSG:2056"
+
+# Needs approval or fees on geodienste.ch, so it is listed but not ingested.
+[source.VD]
+name = "Canton de Vaud, mensuration officielle via geodienste.ch"
+url = "https://www.geodienste.ch/downloads/av?cantons=VD"
+licence = "Freigabe erforderlich (approval required)"
+licence_url = "https://www.geodienste.ch/downloads/av"
+access = "approval-required"

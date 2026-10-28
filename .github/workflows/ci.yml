@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    services:
+      postgis:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: iris
+          POSTGRES_PASSWORD: iris
+          POSTGRES_DB: iris_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U iris" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      IRIS_TEST_DATABASE_URL: postgresql+psycopg://iris:iris@localhost:5432/iris_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pytest -q
+      - name: migration
+        run: IRIS_DATABASE_URL=$IRIS_TEST_DATABASE_URL alembic upgrade head
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir -p data logs results && chmod 777 data logs results docs
+      - run: docker compose build
+      - run: docker compose up -d db
+      - run: docker compose run --rm app init-db
+      - run: docker compose run --rm app inspect tests/data/synthetic_arc.gpkg
+      - run: docker compose run --rm app validate
+      - run: docker compose down -v

@@ -1,0 +1,35 @@
+# Isolated staging only: its own PostGIS, nothing points at iris_core or production.
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: iris-cadastre-ch-db
+    environment:
+      POSTGRES_DB: iris_staging
+      POSTGRES_USER: iris
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-iris}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - iris_cadastre_ch_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iris -d iris_staging"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      IRIS_DATABASE_URL: postgresql+psycopg://iris:${POSTGRES_PASSWORD:-iris}@db:5432/iris_staging
+      IRIS_DB_SCHEMA: iris_staging
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./results:/app/results
+      - ./docs:/app/docs
+
+volumes:
+  iris_cadastre_ch_pg:

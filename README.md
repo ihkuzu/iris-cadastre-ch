@@ -1,0 +1,138 @@
+# iris-cadastre-ch
+
+Ingestion module for Swiss cadastral parcels (assignment IRIS-EU-CH-AV, task 143). It reads the
+official cadastral survey (Amtliche Vermessung, AV) as published by the cantons on geodienste.ch,
+checks every parcel, and loads it with its provenance into `iris_staging.cadastre_switzerland`
+in PostGIS. It only ever writes to an isolated staging schema.
+
+```
+geodienste.ch GeoPackage ──> extract ──> map fields ──> check & normalise ──> load (upsert) ──> report
+   (per canton, LV95)        layers,      DM.01 names    CRS, geometry,      iris_staging      quality
+                             SHA-256      to one schema  keys, duplicates    + rejected rows   report
+```
+
+## Quick start (Docker)
+
+```
+cp .env.example .env
+docker compose up -d db                     # own PostGIS on 127.0.0.1:5434, nothing else
+docker compose run --rm app init-db         # create schema and tables
+
+# download one canton (or put the zip from geodienste.ch into data/raw/<KT>/ yourself)
+docker compose run --rm app download AI
+docker compose run --rm app inspect data/raw/AI/av_AI_gpkg_lv95.zip
+docker compose run --rm app ingest AI --dry-run     # check only
+docker compose run --rm app ingest AI
+docker compose run --rm app report                  # docs/quality_report.md, results/
+docker compose run --rm app validate                # exit code 1 if a check fails
+```
+
+Running `ingest` again on the same file changes nothing (`inserted 0, updated 0, unchanged N`).
+
+## Local run and tests
+
+Python 3.11 or newer.
+
+```
+pip install -r requirements-dev.txt
+pytest -q                                   # unit tests, no database needed
+IRIS_TEST_DATABASE_URL=postgresql+psycopg://iris:iris@localhost:5434/iris_staging pytest -q   # plus database tests
+ruff check . && ruff format --check .
+alembic upgrade head                        # the same tables through a migration
+```
+
+The database tests create and drop their own schema `iris_staging_test`.
+
+## Data provenance
+
+- Source: geodienste.ch, offer "Amtliche Vermessung" version 24.0, model DM.01-AV-CH, LV95
+  (EPSG:2056), GeoPackage per canton. Details and links: [docs/sources.md](docs/sources.md).
+- Cantons: AI (Appenzell Innerrhoden), BS (Basel-Stadt) and GE (Genève), FR configured as well.
+  All are freely available with attribution; cantons that need approval (JU, LU, NE, NW, OW, VD)
+  are configured as closed and the loader refuses them.
+- Every row stores the source name, download URL, licence and terms URL, file name, SHA-256 of
+  the file, layer, feature id, source CRS, the dataset date and all original attributes.
+- Every run is recorded in `ingestion_runs` with counts, rejection reasons and the field mapping.
+- Attribution: data © the respective canton, via geodienste.ch.
+
+## Schema mapping
+
+| Column | From | Notes |
+|---|---|---|
+| `country` | constant | `CH` |
+| `canton`, `canton_name` | configuration | two-letter code, checked against a canton attribute if present |
+| `bfs_nr`, `municipality` | municipality boundary layer (`Gemeindegrenze`) | point inside the parcel |
+| `nbident` | `Grundstueck.NBIdent` | numbering area, starts with the canton code |
+| `parcel_number` | `Grundstueck.Nummer` | |
+| `egrid` | `Grundstueck.EGRIS_EGRID` | national id `CH` + 12 characters, unique, optional |
+| `parcel_type`, `completeness` | `Art`, `Vollstaendigkeit` | as delivered |
+| `area_source_m2` | `Liegenschaft.Flaechenmass` | the legal area |
+| `area_m2` | computed in LV95 | m², compared with `area_source_m2` |
+| `geom` | `Liegenschaft.Geometrie` | MultiPolygon, EPSG:2056, arcs stroked |
+| `geom_wgs84` | derived | MultiPolygon, EPSG:4326 |
+| `geometry_repaired` | check | true when an invalid polygon was repaired |
+| `source_*`, `licence*` | configuration and file | provenance, see above |
+| `source_attributes` | all original columns | JSON, nothing is dropped |
+| `record_hash`, `run_id`, `first_seen_at`, `updated_at` | ingestion | audit |
+
+Key: `canton + nbident + parcel_number` (unique), as in DM.01-AV-CH. Column names are matched in
+any spelling (`EGRIS_EGRID`, `egris_egrid`, `egrid` ...); if numbers and geometry come in two
+layers (`Grundstueck` and `Liegenschaft`), they are joined.
+
+## Checks and fault handling
+
+| Problem | What happens |
+|---|---|
+| NBIdent or number missing | rejected: `missing_key` |
+| EGRID not `CH` + 12 characters | rejected: `malformed_egrid` |
+| no geometry, or not an area | rejected: `empty_geometry`, `not_polygon` |
+| invalid polygon | repaired if the area changes by at most 1 %, else rejected: `invalid_geometry` |
+| identical copy | stored once, the copy recorded as `exact_duplicate` |
+| same key, different content | all copies held back: `conflicting_duplicate` |
+| same EGRID on two keys | `duplicate_egrid`, or `egrid_already_stored` across runs |
+| canton attribute differs | rejected: `canton_mismatch` |
+| CRS missing | taken from the configuration, logged |
+| LV03 data | reprojected to LV95, logged |
+| any other CRS | the file is refused |
+| database error during load | transaction rolled back, run marked `failed` with the error |
+| schema not `iris_staging*`, closed licence, synthetic data in the main schema | refused before writing |
+
+Rejected features are stored in `rejected_records` with the reason, their attributes and WKT,
+so nothing is silently dropped. Logs go to the console and, one JSON line per event with run id,
+canton and file, to `logs/ingest.jsonl`.
+
+## Result and quality report
+
+`python main.py report` builds [docs/quality_report.md](docs/quality_report.md) and
+`results/summary.json` and `results/sample_parcels.csv` from the database: coverage per canton,
+integrity checks, rejected records by reason, runs and sample rows. `sql/validation.sql` holds the
+acceptance checks (valid geometries, SRIDs, unique keys and EGRIDs, provenance, location).
+
+## Assumptions and limitations
+
+See the end of the [quality report](docs/quality_report.md) and [docs/report_notes.md](docs/report_notes.md).
+In short: configured cantons only, no INTERLIS reader (the GeoPackage of the same data is used),
+building rights and projected parcels out of scope, DMAV migration of the cantons by 2027 will
+need a mapping update.
+
+## Test data
+
+All test data is synthetic and generated in `tests/fixtures.py` (plus one arc polygon in
+`tests/data/synthetic_arc.gpkg`): canton code `XX`, EGRIDs starting `CH9999`, the note
+`SYNTHETIC test fixture`. It is never presented as cadastre data, and the loader refuses to put
+it into the main staging schema.
+
+## Layout
+
+```
+app/extractors   read files, pick layers, hash        app/loaders     upsert, runs, rejections
+app/parsers      column name mapping                   app/reports     quality report
+app/transformers checks, CRS, geometry, duplicates     app/runners     command line
+app/database     tables, staging guard                 config/         sources and licences
+alembic/         migration                             sql/            validation queries
+```
+
+## Licence
+
+Code: MIT. Data: © the cantons, under their terms via geodienste.ch; not included in this
+repository.
