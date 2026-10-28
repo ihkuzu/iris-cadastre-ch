@@ -30,6 +30,7 @@ WARNINGS = {
     "egrid_shared_by_parts": "numbered part <article>.<nn> sharing the EGRID of its parcel",
     "area_differs_from_source": "computed area differs from Flaeche by more than the tolerance",
     "egrid_moved": "EGRID now on another parcel of this file, taken over from the stored one",
+    "egrid_taken_by_new_key": "stored parcel left the source; its EGRID went to the new number",
     "no_municipality": "no BFS number in the row or the boundary layer",
     "crs_from_config": "file had no CRS, the configured one was used",
     "reprojected_from_lv03": "LV03 input reprojected to LV95",
@@ -56,11 +57,13 @@ def gather(
                 count(*) FILTER (WHERE geometry_repaired) AS repaired,
                 round(sum(area_m2) / 1e6, 2) AS area_km2,
                 count(*) FILTER (WHERE area_source_m2 IS NOT NULL
-                    AND abs(area_m2 - area_source_m2) > greatest(:m2, :share * area_source_m2)) AS area_mismatch,
+                    AND abs(area_m2 - area_source_m2) > greatest(CAST(:m2 AS numeric),
+                        CAST(:share AS numeric) * area_source_m2)) AS area_mismatch,
                 min(source_dataset_date) AS dataset_date, max(licence) AS licence, max(source_crs) AS source_crs
                 FROM "{s}".{t} GROUP BY canton, canton_name ORDER BY canton"""),
             "runs": q("""SELECT run_id::text, canton, source_file, left(source_sha256, 12) AS sha256, status,
                 read, accepted, inserted, updated, unchanged, rejected, repaired, not_in_source,
+                coalesce((details->>'merged_parts')::int, 0) AS merged,
                 to_char(started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS started, details
                 FROM "{s}".ingestion_runs ORDER BY started_at DESC LIMIT 20"""),
             "rejected": q("""SELECT canton, reason, count(*) AS n FROM "{s}".rejected_records
@@ -163,6 +166,7 @@ def write(data: dict, report: Path, results: Path, notes: Path | None = None) ->
                 "updated",
                 "unchanged",
                 "rejected",
+                "merged",
                 "repaired",
                 "not_in_source",
             ],

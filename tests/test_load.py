@@ -1,6 +1,7 @@
 import dataclasses
 
 import pytest
+from shapely.geometry import Polygon
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
@@ -23,6 +24,8 @@ def eng(db_url):
     with e.begin() as conn:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {SCHEMA} CASCADE"))
     yield e
+    with e.begin() as conn:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {SCHEMA} CASCADE"))
     e.dispose()
 
 
@@ -98,13 +101,48 @@ def test_rejections_are_stored_not_dropped(eng, tmp_gpkg, settings, source):
 def test_egrid_stored_under_another_key_is_rejected(eng, tmp_gpkg, settings, source):
     fixtures.write(tmp_gpkg, fixtures.parcels(2))
     ingest(eng, tmp_gpkg, settings, source)
-    rows = fixtures.parcels(2)
-    rows[1]["Nummer"] = "999"
+    rows = fixtures.parcels(3)
+    # 101 is still in the file (its new version is rejected), so 102 may not take its EGRID
+    rows[1]["geometry"] = Polygon()
+    rows[2]["EGRIS_EGRID"] = rows[1]["EGRIS_EGRID"]
     other = tmp_gpkg.with_name("other.gpkg")
     fixtures.write(other, rows)
     stats = ingest(eng, other, settings, source)
-    assert stats.rejected == 1 and stats.unchanged == 1
-    assert count(eng, "SELECT reason FROM S.rejected_records") == "egrid_already_stored"
+    assert (stats.rejected, stats.unchanged, stats.stale_rejected) == (2, 1, 1)
+    reasons = count(eng, "SELECT string_agg(reason, ',' ORDER BY reason) FROM S.rejected_records")
+    assert reasons == "egrid_already_stored,empty_geometry"
+
+
+def test_a_renumbered_parcel_takes_its_egrid_with_it(eng, tmp_gpkg, settings, source):
+    fixtures.write(tmp_gpkg, fixtures.parcels(2))
+    ingest(eng, tmp_gpkg, settings, source)
+    rows = fixtures.parcels(2)
+    rows[1]["Nummer"] = "999"  # 101 became 999, same EGRID
+    other = tmp_gpkg.with_name("other.gpkg")
+    fixtures.write(other, rows)
+    stats = ingest(eng, other, settings, source)
+    assert (stats.inserted, stats.rejected, stats.not_in_source) == (1, 0, 1)
+    assert count(eng, "SELECT egrid FROM S.cadastre_switzerland WHERE parcel_number = '101'") is None
+    assert count(eng, "SELECT egrid FROM S.cadastre_switzerland WHERE parcel_number = '999'") == "CH999900000001"
+    assert (
+        count(
+            eng,
+            "SELECT details->'warnings'->>'egrid_taken_by_new_key' FROM S.ingestion_runs"
+            " ORDER BY started_at DESC LIMIT 1",
+        )
+        == "1"
+    )
+
+
+def test_a_stored_parcel_whose_new_version_is_rejected_is_stale_not_gone(eng, tmp_gpkg, settings, source):
+    fixtures.write(tmp_gpkg, fixtures.parcels(2))
+    ingest(eng, tmp_gpkg, settings, source)
+    rows = fixtures.parcels(2)
+    rows[1]["EGRIS_EGRID"] = "CH-BAD"
+    other = tmp_gpkg.with_name("other.gpkg")
+    fixtures.write(other, rows)
+    stats = ingest(eng, other, settings, source)
+    assert (stats.rejected, stats.stale_rejected, stats.not_in_source) == (1, 1, 0)
 
 
 def test_failed_run_is_recorded_and_leaves_no_rows(eng, tmp_gpkg, settings, source, monkeypatch):

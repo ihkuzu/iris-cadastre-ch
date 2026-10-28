@@ -236,11 +236,17 @@ def test_synthetic_rows_are_refused_under_a_real_canton(tmp_gpkg, settings, sour
         run(tmp_gpkg, settings, real)
 
 
-def test_rows_from_another_canton_are_rejected(tmp_gpkg, settings, source):
-    rows = [{k: v for k, v in r.items() if k != "Note"} for r in fixtures.parcels(2)]
+def test_rows_from_another_canton_are_rejected_and_a_wrong_file_refused(tmp_gpkg, settings, source):
+    rows = [{k: v for k, v in r.items() if k != "Note"} for r in fixtures.parcels(3)]
+    for r in rows[1:]:
+        r["NBIdent"] = "AI0200003101"
     fixtures.write(tmp_gpkg, rows)
-    out = run(tmp_gpkg, settings, dataclasses.replace(source, canton="AI", name="looks real"))
-    assert dict(out.reasons) == {"canton_mismatch": 2}
+    ai = dataclasses.replace(source, canton="AI", name="looks real")
+    out = run(tmp_gpkg, settings, ai)
+    assert dict(out.reasons) == {"canton_mismatch": 1} and len(out.rows) == 2
+    fixtures.write(tmp_gpkg, [{**r, "NBIdent": "XX0200000001"} for r in rows])
+    with pytest.raises(ValueError, match="wrong file"):
+        run(tmp_gpkg, settings, ai)
 
 
 def test_a_new_export_with_the_same_content_has_the_same_hash(tmp_gpkg, settings, source):

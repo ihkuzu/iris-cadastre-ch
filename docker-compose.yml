@@ -32,6 +32,7 @@ services:
       - ./logs:/app/logs
       - ./results:/app/results
       - ./docs:/app/docs
+      - ./config:/app/config:ro
 
 volumes:
   iris_cadastre_ch_pg:

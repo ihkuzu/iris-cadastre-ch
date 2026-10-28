@@ -119,3 +119,13 @@ def test_download_network_error_leaves_no_partial_file(env, monkeypatch, capsys)
 def test_closed_canton_is_refused_before_reading(env, capsys):
     assert main(["ingest", "VD"]) == 2
     assert "not open" in capsys.readouterr().out
+
+
+def test_synthetic_file_ingested_as_a_real_canton_is_refused(env, db_url, monkeypatch, capsys):
+    from pathlib import Path as P
+
+    monkeypatch.setenv("IRIS_DATABASE_URL", db_url)
+    get_settings.cache_clear()
+    fixture = P(__file__).parent / "data" / "synthetic_geodienste.gpkg"
+    assert main(["ingest", "AI", "--file", str(fixture)]) == 2
+    assert "synthetic" in capsys.readouterr().err

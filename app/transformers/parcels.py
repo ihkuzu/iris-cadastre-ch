@@ -220,6 +220,7 @@ def transform(extract: Extract, source: Source, settings) -> Result:
         geom = feature.geometry
         reject = {"canton": source.canton, "source_feature_id": str(fid), "source_attributes": raw, "geom": geom}
         nbident, number = _text(feature[m["nbident"]]), _text(feature[m["parcel_number"]])
+        reject["key"] = (nbident, number)
         if not nbident or not number:
             out.rejected.append(
                 {**_wkt(dict(reject)), "reason": "missing_key", "detail": f"nbident={nbident!r} number={number!r}"}
@@ -295,6 +296,10 @@ def transform(extract: Extract, source: Source, settings) -> Result:
         candidates.append((row, poly, reject))
         out.repaired += repaired
     _dedupe(candidates, out, source.egrid_parts)
+    mismatch = out.reasons["canton_mismatch"]
+    if not source.synthetic and out.read and mismatch > 0.5 * out.read:
+        # most rows belong to another canton (or are test data): the wrong file, nothing is loaded
+        raise ValueError(f"{source.canton}: {mismatch} of {out.read} features are not from this canton; wrong file?")
     for row in out.rows:
         if area_differs(row["area_m2"], row["area_source_m2"], settings):
             out.warnings["area_differs_from_source"] += 1

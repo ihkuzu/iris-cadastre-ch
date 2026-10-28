@@ -104,6 +104,7 @@ def geodienste(path: Path, parts: bool = False) -> Path:
             "Flaeche": round(geom.area),
             "Gueltigkeit": "gueltig",
             "Kanton": "XX",
+            "Note": "SYNTHETIC test fixture",
             "geometry": geom,
             **extra,
         }

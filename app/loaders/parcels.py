@@ -57,6 +57,7 @@ class LoadStats:
     unchanged: int = 0
     rejected: int = 0
     not_in_source: int = 0
+    stale_rejected: int = 0
 
 
 def _rows(result: Result, extract: Extract, source: Source, run_id, skip: set) -> list[dict]:
@@ -136,17 +137,26 @@ def load(engine: Engine, schema: str, table: str, result: Result, extract: Extra
                 stats.updated += len(flags) - sum(flags)
             stats.unchanged = len(same)
             _mark_seen(conn, schema, table, source.canton, stats.run_id, same)
-            stats.not_in_source = conn.execute(
-                select(func.count()).where(
+            missing = conn.execute(
+                select(parcels.c.nbident, parcels.c.parcel_number).where(
                     parcels.c.canton == source.canton, parcels.c.last_seen_run_id != stats.run_id
                 )
-            ).scalar_one()
+            ).all()
+            # a stored parcel whose new version was rejected is stale, not gone from the source
+            held = {r["key"] for r in result.rejected if r.get("key")}
+            stats.stale_rejected = sum(1 for k in missing if tuple(k) in held)
+            stats.not_in_source = len(missing) - stats.stale_rejected
+            if stats.stale_rejected:
+                log.warning("{} stored parcels keep their old version, the new one was rejected", stats.stale_rejected)
             if stats.not_in_source:
                 log.warning(
                     "{} stored parcels are no longer in this source file; kept, not deleted", stats.not_in_source
                 )
             if result.rejected:
-                conn.execute(rejected.insert(), [{**r, "run_id": stats.run_id} for r in result.rejected])
+                conn.execute(
+                    rejected.insert(),
+                    [{**{k: v for k, v in r.items() if k != "key"}, "run_id": stats.run_id} for r in result.rejected],
+                )
             stats.rejected = len(result.rejected)
             conn.execute(
                 update(runs)
@@ -165,6 +175,7 @@ def load(engine: Engine, schema: str, table: str, result: Result, extract: Extra
                     details={
                         "reasons": dict(result.reasons),
                         "merged_parts": result.merged,
+                        "stale_rejected": stats.stale_rejected,
                         "warnings": dict(result.warnings),
                         "mapping": result.mapping,
                         "source_crs": result.source_crs,
@@ -210,6 +221,18 @@ def _drop_egrid_clashes(conn, parcels, rows: list[dict], result: Result, parts: 
     if moved:
         result.warnings["egrid_moved"] += len(moved)
     taken = {e: o for e, o in taken.items() if e not in moved}
+    # a stored parcel that left the source was renumbered: the new key takes the EGRID over
+    held = {r["key"] for r in result.rejected if r.get("key")}
+    gone = {e: o for e, o in taken.items() if o not in now and (o[1], o[2]) not in held}
+    for c, n, p in gone.values():
+        conn.execute(
+            update(parcels)
+            .where(parcels.c.canton == c, parcels.c.nbident == n, parcels.c.parcel_number == p)
+            .values(egrid=None, updated_at=func.now())
+        )
+    if gone:
+        result.warnings["egrid_taken_by_new_key"] += len(gone)
+    taken = {e: o for e, o in taken.items() if e not in gone}
     keep = []
     for r in rows:
         owner = taken.get(r["egrid"]) if r["egrid"] else None

@@ -48,7 +48,11 @@ pytest -q                                   # unit tests, no database needed
 IRIS_TEST_DATABASE_URL=postgresql+psycopg://iris:iris@localhost:5434/iris_staging pytest -q   # plus database tests
 ruff check . && ruff format --check .
 alembic upgrade head                        # the same tables through a migration
+pip install -e .                            # optional: an `iris-cadastre-ch` command for this checkout
 ```
+
+The command reads `config/`, `sql/` and writes `data/`, `logs/`, `results/` next to the checkout,
+so it is installed editable (`-e`), not as a standalone package.
 
 The database tests create and drop their own schema `iris_staging_test`.
 
@@ -112,6 +116,10 @@ GeoPackage is flat: the layer `resf` holds geometry and Grundstueck attributes t
 | any other CRS | the file is refused |
 | polygon empty after rounding to 1 mm | rejected: `empty_geometry` |
 | parcel stored before but missing in the new file | kept, counted in `ingestion_runs.not_in_source` and logged |
+| stored parcel whose new version is rejected | old version kept, counted as `stale_rejected` in the run details |
+| parcel renumbered, same EGRID | the new number takes the EGRID, the old row keeps no EGRID (`egrid_taken_by_new_key`) |
+| NBIdent of another canton | rejected: `canton_mismatch`; if most rows are, the whole file is refused as the wrong file |
+| rows marked `SYNTHETIC` under a real canton | the file is refused |
 | server returns an order page instead of a zip | `download` stops, nothing is kept |
 | database error during load | transaction rolled back, run marked `failed` with the error |
 | schema not `iris_staging*`, closed licence, synthetic data in the main schema | refused before writing |
@@ -126,7 +134,7 @@ canton and file, to `logs/ingest.jsonl`.
 `results/summary.json` and `results/sample_parcels.csv` from the database: coverage per canton,
 integrity checks, rejected records by reason, runs and sample rows. `sql/validation.sql` holds the
 acceptance checks (valid geometries, SRIDs, unique keys, one parcel per EGRID, provenance,
-location). `sql/examples.sql` has example queries (parcel under a point, coverage per
+location); it is run by `main.py validate`, which fills in the cantons with `egrid_parts`. `sql/examples.sql` has example queries (parcel under a point, coverage per
 municipality) and the queries behind the findings in the quality report:
 `docker compose exec -T db psql -U iris -d iris_staging < sql/examples.sql`.
 
