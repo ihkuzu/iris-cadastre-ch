@@ -56,10 +56,14 @@ def gather(engine: Engine, schema: str, table: str) -> dict:
                 count(egrid) - count(DISTINCT egrid) AS duplicate_egrids,
                 count(*) FILTER (WHERE country <> 'CH') AS wrong_country
                 FROM "{s}".{t}"""),
+            # five parcels per canton, picked by EGRID so the sample is spread over the canton
             "sample": q("""SELECT canton, bfs_nr, municipality, nbident, parcel_number, egrid, area_m2,
                 round(ST_X(ST_PointOnSurface(geom_wgs84))::numeric, 6) AS lon,
                 round(ST_Y(ST_PointOnSurface(geom_wgs84))::numeric, 6) AS lat
-                FROM "{s}".{t} ORDER BY canton, nbident, parcel_number LIMIT 20"""),
+                FROM (SELECT *, row_number() OVER (
+                          PARTITION BY canton ORDER BY md5(coalesce(egrid, nbident || parcel_number))) AS n
+                      FROM "{s}".{t}) p
+                WHERE n <= 5 ORDER BY canton, nbident, parcel_number"""),
         }
 
 
@@ -128,7 +132,7 @@ def write(data: dict, report: Path, results: Path, notes: Path | None = None) ->
             ],
         ),
         "\n## Sample rows\n",
-        _table(data["sample"][:10], list(data["sample"][0]) if data["sample"] else []),
+        _table(data["sample"], list(data["sample"][0]) if data["sample"] else []),
     ]
     if notes and notes.exists():
         lines += ["\n", notes.read_text(encoding="utf-8")]
