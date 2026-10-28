@@ -192,9 +192,11 @@ def test_numbered_parts_of_one_parcel_may_share_the_egrid(tmp_gpkg, settings, so
     rows[1].update(Nummer="2007.03102", EGRIS_EGRID="CH999900002007")
     rows[2].update(Nummer="2008.00101", EGRIS_EGRID="CH999900002007")
     fixtures.write(tmp_gpkg, rows)
-    out = run(tmp_gpkg, settings, source)
-    assert dict(out.reasons) == {"duplicate_egrid": 3}
+    fribourg = dataclasses.replace(source, egrid_parts=True)
+    assert dict(run(tmp_gpkg, settings, fribourg).reasons) == {"duplicate_egrid": 3}
     rows[2].update(EGRIS_EGRID="CH999900002008")
     fixtures.write(tmp_gpkg, rows)
-    out = run(tmp_gpkg, settings, source)
+    out = run(tmp_gpkg, settings, fribourg)
     assert not out.rejected and out.warnings["egrid_shared_by_parts"] == 2
+    # without the canton setting, two numbers with one EGRID stay a conflict
+    assert dict(run(tmp_gpkg, settings, source).reasons) == {"duplicate_egrid": 2}

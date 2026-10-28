@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -12,11 +13,11 @@ from pathlib import Path
 from loguru import logger
 from pyogrio.errors import DataLayerError, DataSourceError
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.config.settings import ROOT, Settings, get_settings
 from app.config.sources import load_sources
-from app.database.guard import StagingGuardError
+from app.database.guard import StagingGuardError, check_schema
 from app.database.session import engine, prepare
 from app.extractors import av_file
 from app.loaders.parcels import load
@@ -63,9 +64,14 @@ def cmd_download(args, settings) -> int:
     partial = target.with_name(target.name + ".part")
     print(f"downloading {source.url}\n         to {target}")
     request = urllib.request.Request(source.url, headers={"User-Agent": "iris-cadastre-ch/0.1"})
-    with urllib.request.urlopen(request, timeout=120) as res, open(partial, "wb") as fh:
-        while block := res.read(1 << 20):
-            fh.write(block)
+    try:
+        with urllib.request.urlopen(request, timeout=120) as res, open(partial, "wb") as fh:
+            while block := res.read(1 << 20):
+                fh.write(block)
+    except (OSError, urllib.error.URLError) as error:
+        partial.unlink(missing_ok=True)
+        print(f"download failed: {error}")
+        return 2
     if not zipfile.is_zipfile(partial):
         # geodienste.ch answers some formats with an order page instead of the file
         partial.unlink()
@@ -84,7 +90,13 @@ def cmd_ingest(args, settings) -> int:
         print(f"no source configured for {code}; see {settings.sources_file}")
         return 2
     source = sources[code]
-    path = Path(args.file) if args.file else settings.data_dir / "raw" / code / (source.file or "")
+    if not source.lawful:
+        print(f"{code}: access is {source.access!r}, not open; it is not ingested")
+        return 2
+    if not args.file and not source.file:
+        print(f"{code}: no file configured; pass --file")
+        return 2
+    path = Path(args.file) if args.file else settings.data_dir / "raw" / code / source.file
     extract = av_file.read(
         path,
         layer=args.layer or source.layer,
@@ -124,12 +136,14 @@ def cmd_init(args, settings) -> int:
 
 def cmd_report(args, settings) -> int:
     data = quality.gather(engine(settings.database_url), settings.db_schema, settings.table)
-    quality.write(data, _root(args.out), _root(args.results), ROOT / "docs" / "report_notes.md")
+    notes = None if args.no_notes else ROOT / "docs" / "report_notes.md"
+    quality.write(data, _root(args.out), _root(args.results), notes)
     print(f"wrote {args.out} and {args.results}/")
     return 0
 
 
 def cmd_validate(args, settings) -> int:
+    check_schema(settings.db_schema)
     sql = (ROOT / "sql" / "validation.sql").read_text(encoding="utf-8")
     sql = sql.replace("iris_staging.cadastre_switzerland", f"{settings.db_schema}.{settings.table}")
     sql = sql.replace("iris_staging.", f"{settings.db_schema}.")
@@ -163,10 +177,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("report", help="write the quality report from the database")
     p.add_argument("--out", default="docs/quality_report.md")
     p.add_argument("--results", default="results")
+    p.add_argument("--no-notes", action="store_true", help="leave out docs/report_notes.md (findings of the real run)")
     sub.add_parser("validate", help="run sql/validation.sql; exit 1 if a check fails")
     args = parser.parse_args(argv)
-    settings = get_settings()
-    setup_logging(settings)
     handlers = {
         "inspect": cmd_inspect,
         "download": cmd_download,
@@ -176,10 +189,16 @@ def main(argv: list[str] | None = None) -> int:
         "validate": cmd_validate,
     }
     try:
+        settings = get_settings()
+        setup_logging(settings)
         return handlers[args.cmd](args, settings)
-    except (FileNotFoundError, ValueError, KeyError, StagingGuardError, DataSourceError, DataLayerError) as error:
-        logger.error("{}", error)
+    except (ValueError, KeyError, StagingGuardError, DataSourceError, DataLayerError, zipfile.BadZipFile) as error:
+        print(f"error: {error}", file=sys.stderr)
         return 2
-    except (IntegrityError, OperationalError) as error:
-        logger.error("database: {}", str(error.orig or error).splitlines()[0])
+    except SQLAlchemyError as error:
+        print(f"database error: {str(getattr(error, 'orig', None) or error).splitlines()[0]}", file=sys.stderr)
         return 3
+    except OSError as error:
+        # missing files, no write access to data/ or logs/, network errors during download
+        print(f"error: {error}", file=sys.stderr)
+        return 2

@@ -15,6 +15,8 @@ geodienste.ch GeoPackage ──> extract ──> map fields ──> check & norm
 
 ```
 cp .env.example .env
+# Linux only, if your user id is not 1000: let the container user write the mounted folders
+# mkdir -p data logs results && chmod a+w data logs results docs
 docker compose up -d db                     # own PostGIS on 127.0.0.1:5434, nothing else
 docker compose run --rm app init-db         # create schema and tables
 
@@ -27,14 +29,15 @@ docker compose run --rm app report                  # docs/quality_report.md, re
 docker compose run --rm app validate                # exit code 1 if a check fails
 ```
 
-Running `ingest` again on the same file writes no parcel rows (`inserted 0, updated 0,
-unchanged N`); only a new entry in `ingestion_runs` is added. `download` keeps a file that is
+Running `ingest` again on unchanged data changes no parcel content (`inserted 0, updated 0,
+unchanged N`); it adds an entry to `ingestion_runs` and sets `last_seen_run_id`. A new export
+with the same content is also unchanged, since the export date is not part of the record hash. `download` keeps a file that is
 already there (geodienste.ch allows one download per dataset and day); `--force` fetches it again.
 
 Updating an existing database after a schema change: `docker compose down -v` removes only this
 project's PostGIS volume (`iris_cadastre_ch_pg`), then `up -d db` and `init-db` again.
-If the bind-mounted `data/`, `logs/` or `results/` folders are not writable for the container
-user (uid 1000) on Linux, create them first and give that user write access.
+The container runs as uid 1000 and writes to the bind-mounted `data/`, `logs/`, `results/` and
+`docs/`; on Linux with another user id, use the `chmod` line above.
 
 ## Local run and tests
 
@@ -103,7 +106,7 @@ GeoPackage is flat: the layer `resf` holds geometry and Grundstueck attributes t
 | identical copy | stored once, the copy recorded as `exact_duplicate` |
 | same key, several separate polygons, same attributes | merged into one MultiPolygon, areas summed (`multipart_parcel` warning) |
 | same key, different content or overlapping parts | all copies held back: `conflicting_duplicate` |
-| same EGRID on two land register parcels | `duplicate_egrid`, or `egrid_already_stored` across runs; numbered parts `<article>.<nn>` of one parcel (Fribourg) may share it |
+| same EGRID on two land register parcels | `duplicate_egrid`, or `egrid_already_stored` across runs; in cantons with `egrid_parts = true` (Fribourg) the numbered parts `<article>.<nn>` of one parcel may share it |
 | canton attribute differs | rejected: `canton_mismatch` |
 | CRS missing | taken from the configuration, logged |
 | LV03 data | reprojected to LV95, logged |
@@ -148,10 +151,12 @@ need a mapping update.
 
 ## Test data
 
-All test data is synthetic and generated in `tests/fixtures.py` (plus one arc polygon in
-`tests/data/synthetic_arc.gpkg`): canton code `XX`, EGRIDs starting `CH9999`, the note
-`SYNTHETIC test fixture`. It is never presented as cadastre data, and the loader refuses to put
-it into the main staging schema.
+All test data is synthetic and generated in `tests/fixtures.py`: canton code `XX`, EGRIDs
+starting `CH9999`, the note `SYNTHETIC test fixture`. `tests/data/synthetic_geodienste.gpkg`
+copies the flat layout of the geodienste.ch GeoPackage (`resf`, `resfproj`, `dprsf`, `mbsf`) for
+the container test in CI; it is rebuilt with `fixtures.geodienste(path, parts=True)`.
+`tests/data/synthetic_arc.gpkg` holds one polygon with an arc. None of it is presented as
+cadastre data, and the loader refuses to put it into the main staging schema.
 
 ## Layout
 

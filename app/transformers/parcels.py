@@ -121,14 +121,13 @@ HASHED = (
     "completeness",
     "validity",
     "area_source_m2",
-    "source_dataset_date",
     "source_attributes",
 )
 
 
-def grundstueck(canton: str, nbident: str, number: str) -> tuple[str, str, str]:
-    """The land register parcel a row belongs to: Fribourg numbers its parts as <article>.<part>."""
-    return canton, nbident, number.split(".", 1)[0]
+def grundstueck(canton: str, nbident: str, number: str, parts: bool = False) -> tuple[str, str, str]:
+    """The land register parcel a row belongs to; with parts, <article>.<nn> belongs to <article>."""
+    return canton, nbident, number.split(".", 1)[0] if parts else number
 
 
 SAME_PARCEL = ("egrid", "bfs_nr", "parcel_type", "completeness", "validity")
@@ -155,6 +154,18 @@ def _municipalities(extract: Extract, frame: gpd.GeoDataFrame) -> pd.DataFrame |
     return joined.rename(columns={cols["bfs_nr"]: "bfs_nr", cols.get("municipality", "_"): "municipality"})
 
 
+def _names(extract: Extract) -> dict[int, str]:
+    """Municipality name per BFS number from the boundary layer."""
+    mun = extract.municipalities
+    if mun is None or mun.empty:
+        return {}
+    cols = find_columns(list(mun.columns), MUNICIPALITY)
+    if "bfs_nr" not in cols or "municipality" not in cols:
+        return {}
+    pairs = mun[[cols["bfs_nr"], cols["municipality"]]].dropna()
+    return {int(b): _text(n) for b, n in pairs.itertuples(index=False)}
+
+
 def transform(extract: Extract, source: Source, settings) -> Result:
     frame = extract.frame
     out = Result(read=len(frame))
@@ -177,6 +188,7 @@ def transform(extract: Extract, source: Source, settings) -> Result:
         out.warnings["reprojected_from_lv03"] += len(frame)
         frame = frame.to_crs(LV95)
     mun = _municipalities(extract, frame)
+    names = _names(extract)
     attrs = [c for c in frame.columns if c != "geometry"]
     m = out.mapping
     candidates: list[tuple[dict, MultiPolygon, dict]] = []
@@ -230,6 +242,8 @@ def transform(extract: Extract, source: Source, settings) -> Result:
         name = _text(feature[m["municipality"]]) if "municipality" in m else None
         if mun is not None and fid in mun.index:
             bfs = bfs if bfs is not None else _number(mun.at[fid, "bfs_nr"])
+            # the name belongs to the BFS number; the point lookup is only the fallback
+            name = name or names.get(int(bfs) if bfs is not None else None)
             name = name or (_text(mun.at[fid, "municipality"]) if "municipality" in mun.columns else None)
         row = {
             "country": "CH",
@@ -253,13 +267,15 @@ def transform(extract: Extract, source: Source, settings) -> Result:
         }
         if row["bfs_nr"] is None:
             out.warnings["no_municipality"] += 1
-        if area_src is not None:
-            diff = abs(poly.area - area_src)
-            if diff > max(settings.area_tolerance_m2, settings.area_tolerance_share * area_src):
-                out.warnings["area_differs_from_source"] += 1
         candidates.append((row, poly, reject))
         out.repaired += repaired
-    _dedupe(candidates, out)
+    _dedupe(candidates, out, source.egrid_parts)
+    for row in out.rows:
+        src = row["area_source_m2"]
+        if src is not None and abs(row["area_m2"] - src) > max(
+            settings.area_tolerance_m2, settings.area_tolerance_share * src
+        ):
+            out.warnings["area_differs_from_source"] += 1
     log.info(
         "read {} features: {} accepted, {} rejected, {} repaired",
         out.read,
@@ -272,7 +288,7 @@ def transform(extract: Extract, source: Source, settings) -> Result:
 
 def _wkt(reject: dict) -> dict:
     geom = reject.pop("geom", None)
-    reject["geometry_wkt"] = geom.wkt[:2000] if geom is not None and not geom.is_empty else None
+    reject["geometry_wkt"] = geom.wkt if geom is not None and not geom.is_empty else None
     return reject
 
 
@@ -298,7 +314,7 @@ def _merge_parts(group: list) -> tuple[dict, MultiPolygon, dict] | None:
     return row, merged, group[0][2]
 
 
-def _dedupe(candidates, out: Result) -> None:
+def _dedupe(candidates, out: Result, parts: bool = False) -> None:
     """Exact copies collapse into one row, parts of one parcel are merged, real conflicts are held back."""
     by_key: dict[tuple, list] = defaultdict(list)
     for row, poly, reject in candidates:
@@ -327,7 +343,7 @@ def _dedupe(candidates, out: Result) -> None:
     keys: dict[str, int] = defaultdict(int)
     for row, _, _ in kept:
         if row["egrid"]:
-            owners[row["egrid"]].add(grundstueck(row["canton"], row["nbident"], row["parcel_number"]))
+            owners[row["egrid"]].add(grundstueck(row["canton"], row["nbident"], row["parcel_number"], parts))
             keys[row["egrid"]] += 1
     final = []
     for row, poly, reject in kept:

@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
-from geoalchemy2.shape import from_shape
+from geoalchemy2.shape import from_shape, to_shape
 from loguru import logger
 from sqlalchemy import Engine, bindparam, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
@@ -121,7 +121,7 @@ def load(engine: Engine, schema: str, table: str, result: Result, extract: Extra
                 if stored.get((r["nbident"], r["parcel_number"])) == r["record_hash"]
             }
             rows = _rows(result, extract, source, stats.run_id, same)
-            rows = _drop_egrid_clashes(conn, parcels, rows, result)
+            rows = _drop_egrid_clashes(conn, parcels, rows, result, source.egrid_parts)
             for i in range(0, len(rows), BATCH):
                 chunk = rows[i : i + BATCH]
                 stmt = insert(parcels)
@@ -191,7 +191,7 @@ def load(engine: Engine, schema: str, table: str, result: Result, extract: Extra
     return stats
 
 
-def _drop_egrid_clashes(conn, parcels, rows: list[dict], result: Result) -> list[dict]:
+def _drop_egrid_clashes(conn, parcels, rows: list[dict], result: Result, parts: bool) -> list[dict]:
     """An EGRID already stored for another land register parcel is a conflict, not an update."""
     egrids = [r["egrid"] for r in rows if r["egrid"]]
     if not egrids:
@@ -206,13 +206,14 @@ def _drop_egrid_clashes(conn, parcels, rows: list[dict], result: Result) -> list
     keep = []
     for r in rows:
         owner = taken.get(r["egrid"]) if r["egrid"] else None
-        if owner and grundstueck(*owner) != grundstueck(r["canton"], r["nbident"], r["parcel_number"]):
+        mine = grundstueck(r["canton"], r["nbident"], r["parcel_number"], parts)
+        if owner and grundstueck(*owner, parts) != mine:
             result.rejected.append(
                 {
                     "canton": r["canton"],
                     "source_feature_id": r["source_feature_id"],
                     "source_attributes": r["source_attributes"],
-                    "geometry_wkt": None,
+                    "geometry_wkt": to_shape(r["geom"]).wkt,
                     "reason": "egrid_already_stored",
                     "detail": "/".join(owner),
                 }

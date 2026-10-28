@@ -1,7 +1,9 @@
 __pycache__/
 .venv/
 .env
-/data/
-/logs/
+/data/*
+!/data/.gitkeep
+/logs/*
+!/logs/.gitkeep
 .pytest_cache/
 .ruff_cache/

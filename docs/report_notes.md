@@ -12,7 +12,7 @@
 - Geometry is stored in LV95 (EPSG:2056) as delivered. Arcs are stroked into straight segments by
   GDAL when reading. `geom_wgs84` is a derived copy for web maps (pyproj, Swiss transformation
   without height); the LV95 column is the reference.
-- Areas are computed in LV95 in square metres. A difference to the stored `Flaechenmass` above
+- Areas are computed in LV95 in square metres. A difference to the stated area (`Flaeche`) above
   1 m² and 0.5 % is reported, not corrected: the stored value is the legal one.
 - Municipality: the BFS number is on every `resf` row; the name comes from the municipality
   boundary layer `mbsf` of the same export, by a point inside each parcel.
@@ -28,10 +28,12 @@
 - 275,186 parcels from four cantons are in staging; every integrity check passes. AI, BS and GE
   load without a single rejection, repair or area difference, and a second run of the same file
   writes nothing (`inserted 0, updated 0, unchanged 9143` for AI).
-- Fribourg: 168,506 of 168,520 features are stored, 4 are held back (below).
+- Fribourg: of 168,520 features, 168,506 rows are stored, 4 features are held back (below) and
+  10 are parts merged into 4 multi-polygon parcels (warning `multipart_parcel`).
 - Fribourg delivers one land register parcel as numbered parts `<article>.<nn>` that share the
   parcel's EGRID: 1,605 parts, 2 to 11 per EGRID, always within one NBIdent and article number.
-  A first run rejected these as duplicate EGRIDs; the rule now accepts parts of the same article.
+  An earlier version of the rule rejected these as duplicate EGRIDs; FR is now configured with
+  `egrid_parts = true`, which accepts parts of the same article. Other cantons keep the strict rule.
 - Fribourg: 2 features carry an EGRID that also belongs to a different article. They are held
   back as `duplicate_egrid`, since an EGRID identifies exactly one parcel.
 - Fribourg: parcel `FR213812/1058a` comes twice, in municipalities 2138 and 2163, with different
@@ -42,12 +44,17 @@
   larger, on single polygons with or without holes. The stated area is the legal value of the
   land register and is often not recomputed from the survey geometry where an older survey was
   digitised, which is the likely cause. Both values are stored, the difference is reported and
-  nothing is corrected. `sql/examples.sql` (queries 7 to 9) lists them.
+  nothing is corrected. `sql/examples.sql` (queries 7 to 9) lists them; the output of the real
+  run is in `results/examples_output.txt`.
 - 225 Fribourg parcels have no EGRID; they are stored, the EGRID is optional in the model.
 - All parcels are `vollstaendig` and `rechtskraeftig`; the source has no incomplete or pending
   parcels in the `resf` layer.
 
 ## Known gaps
+
+- An update replaces the stored row (geometry and attributes); earlier versions are not kept in a
+  history table. Each run's file hash in `ingestion_runs` and the kept source files allow an
+  earlier state to be rebuilt.
 
 - Coverage is the configured cantons, not all of Switzerland. Cantons that require approval
   (JU, LU, NE, NW, OW, VD) are deliberately not ingested.

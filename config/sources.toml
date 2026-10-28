@@ -44,6 +44,7 @@ parcel_type = "Liegenschaft"
 name = "Canton de Fribourg / Kanton Freiburg, amtliche Vermessung via geodienste.ch"
 url = "https://www.geodienste.ch/downloads/geopackage/av/FR/deu/av_FR_gpkg_lv95.zip"
 file = "av_FR_gpkg_lv95.zip"
+egrid_parts = true
 licence = "Freie Nutzung, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)"
 licence_url = "https://www.geodienste.ch/terms-of-use"
 access = "open-with-attribution"

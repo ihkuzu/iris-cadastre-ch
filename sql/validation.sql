@@ -1,9 +1,15 @@
 -- Each check returns the number of offending rows; a check passes when that number is 0.
-SELECT 'geometries are valid' AS check_name, count(*) AS found, count(*) = 0 AS passed
+SELECT 'table is not empty' AS check_name, CASE WHEN EXISTS (SELECT 1 FROM iris_staging.cadastre_switzerland)
+       THEN 0 ELSE 1 END AS found, EXISTS (SELECT 1 FROM iris_staging.cadastre_switzerland) AS passed
+UNION ALL
+SELECT 'geometries are valid', count(*), count(*) = 0
   FROM iris_staging.cadastre_switzerland WHERE NOT ST_IsValid(geom)
 UNION ALL
 SELECT 'geometries are LV95 and WGS84', count(*), count(*) = 0
   FROM iris_staging.cadastre_switzerland WHERE ST_SRID(geom) <> 2056 OR ST_SRID(geom_wgs84) <> 4326
+UNION ALL
+SELECT 'areas are positive and match the geometry', count(*), count(*) = 0
+  FROM iris_staging.cadastre_switzerland WHERE area_m2 <= 0 OR abs(ST_Area(geom) - area_m2) > 0.01
 UNION ALL
 SELECT 'parcel keys are unique', count(*) - count(DISTINCT (canton, nbident, parcel_number)),
        count(*) = count(DISTINCT (canton, nbident, parcel_number))
@@ -12,10 +18,10 @@ UNION ALL
 SELECT 'EGRIDs are well formed', count(*), count(*) = 0
   FROM iris_staging.cadastre_switzerland WHERE egrid !~ '^CH[0-9A-Z]{12}$'
 UNION ALL
--- an EGRID may be shared only by the numbered parts <article>.<nn> of one land register parcel
+-- an EGRID belongs to one land register parcel; in FR (egrid_parts) its parts <article>.<nn> share it
 SELECT 'each EGRID belongs to one parcel', count(*), count(*) = 0
   FROM (SELECT egrid FROM iris_staging.cadastre_switzerland WHERE egrid IS NOT NULL GROUP BY egrid
-        HAVING count(DISTINCT (canton, nbident, split_part(parcel_number, '.', 1))) > 1) e
+        HAVING count(DISTINCT (canton, nbident, CASE WHEN canton = 'FR' THEN split_part(parcel_number, '.', 1) ELSE parcel_number END)) > 1) e
 UNION ALL
 SELECT 'canton and country set', count(*), count(*) = 0
   FROM iris_staging.cadastre_switzerland WHERE canton IS NULL OR country <> 'CH'

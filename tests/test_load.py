@@ -1,3 +1,5 @@
+import dataclasses
+
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -141,6 +143,7 @@ def test_parcel_missing_from_a_new_file_is_counted_not_deleted(eng, tmp_gpkg, tm
 
 
 def test_a_new_part_of_a_stored_parcel_may_reuse_its_egrid(eng, tmp_gpkg, tmp_path, settings, source):
+    source = dataclasses.replace(source, egrid_parts=True)
     rows = fixtures.parcels(2)
     rows[0].update(Nummer="2007.03101", EGRIS_EGRID="CH999900002007")
     fixtures.write(tmp_gpkg, rows[:1])

@@ -55,6 +55,8 @@ class Source:
     join_left: str | None = None
     join_right: str | None = None
     dataset_date: str | None = None
+    # Fribourg numbers the parts of one parcel <article>.<nn>; the parts share the parcel's EGRID
+    egrid_parts: bool = False
     notes: str = ""
     fields: dict[str, str] = field(default_factory=dict)
 

@@ -52,7 +52,7 @@ jobs:
           $RUN ingest XX --file tests/data/synthetic_geodienste.gpkg
           $RUN ingest XX --file tests/data/synthetic_geodienste.gpkg | tee second.txt
           grep -q "inserted 0, updated 0, unchanged 5" second.txt
-          $RUN report --out results/ci_report.md --results results/ci
+          $RUN report --no-notes --out results/ci_report.md --results results/ci
           $RUN validate
       - run: docker compose run --rm app validate
       - run: docker compose down -v

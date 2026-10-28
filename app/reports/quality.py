@@ -25,6 +25,17 @@ REASONS = {
 }
 
 
+WARNINGS = {
+    "multipart_parcel": "several polygons of one parcel merged into one MultiPolygon",
+    "egrid_shared_by_parts": "numbered part <article>.<nn> sharing the EGRID of its parcel",
+    "area_differs_from_source": "computed area differs from Flaeche by more than 1 m2 and 0.5 %",
+    "no_municipality": "no BFS number in the row or the boundary layer",
+    "nbident_without_canton_prefix": "NBIdent does not start with the canton code",
+    "crs_from_config": "file had no CRS, the configured one was used",
+    "reprojected_from_lv03": "LV03 input reprojected to LV95",
+}
+
+
 def gather(engine: Engine, schema: str, table: str) -> dict:
     check_schema(schema)
     q = lambda sql: [dict(r._mapping) for r in conn.execute(text(sql.format(s=schema, t=table)))]  # noqa: E731
@@ -42,19 +53,25 @@ def gather(engine: Engine, schema: str, table: str) -> dict:
                 FROM "{s}".{t} GROUP BY canton, canton_name ORDER BY canton"""),
             "runs": q("""SELECT run_id::text, canton, source_file, left(source_sha256, 12) AS sha256, status,
                 read, accepted, inserted, updated, unchanged, rejected, repaired, not_in_source,
-                to_char(started_at, 'YYYY-MM-DD HH24:MI') AS started, details
+                to_char(started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS started, details
                 FROM "{s}".ingestion_runs ORDER BY started_at DESC LIMIT 20"""),
             "rejected": q("""SELECT canton, reason, count(*) AS n FROM "{s}".rejected_records
                 WHERE run_id IN (SELECT DISTINCT ON (canton) run_id FROM "{s}".ingestion_runs
                                  WHERE status = 'succeeded' ORDER BY canton, started_at DESC)
                 GROUP BY canton, reason ORDER BY canton, n DESC"""),
+            "warnings": q("""SELECT canton, w.key AS warning, w.value::int AS n
+                FROM (SELECT DISTINCT ON (canton) canton, details FROM "{s}".ingestion_runs
+                      WHERE status = 'succeeded' ORDER BY canton, started_at DESC) r,
+                     jsonb_each_text(r.details->'warnings') w
+                ORDER BY canton, n DESC"""),
             "checks": q("""SELECT
                 count(*) FILTER (WHERE NOT ST_IsValid(geom)) AS invalid_geometries,
                 count(*) FILTER (WHERE ST_SRID(geom) <> 2056 OR ST_SRID(geom_wgs84) <> 4326) AS wrong_srid,
                 count(*) FILTER (WHERE ST_IsEmpty(geom)) AS empty_geometries,
                 count(*) - count(DISTINCT (canton, nbident, parcel_number)) AS duplicate_keys,
                 (SELECT count(*) FROM (SELECT egrid FROM "{s}".{t} WHERE egrid IS NOT NULL GROUP BY egrid
-                    HAVING count(DISTINCT (canton, nbident, split_part(parcel_number, '.', 1))) > 1) e)
+                    HAVING count(DISTINCT (canton, nbident,
+                        CASE WHEN canton = 'FR' THEN split_part(parcel_number, '.', 1) ELSE parcel_number END)) > 1) e)
                     AS egrids_on_two_parcels,
                 count(*) FILTER (WHERE country <> 'CH') AS wrong_country
                 FROM "{s}".{t}"""),
@@ -79,8 +96,10 @@ def _table(rows: list[dict], cols: list[str]) -> str:
 def write(data: dict, report: Path, results: Path, notes: Path | None = None) -> None:
     results.mkdir(parents=True, exist_ok=True)
     (results / "summary.json").write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+    sample = results / "sample_parcels.csv"
+    sample.unlink(missing_ok=True)
     if data["sample"]:
-        with open(results / "sample_parcels.csv", "w", newline="", encoding="utf-8") as fh:
+        with open(sample, "w", newline="", encoding="utf-8") as fh:
             w = csv.DictWriter(fh, fieldnames=list(data["sample"][0]))
             w.writeheader()
             w.writerows(data["sample"])
@@ -115,7 +134,12 @@ def write(data: dict, report: Path, results: Path, notes: Path | None = None) ->
             [{**r, "meaning": REASONS.get(r["reason"], "")} for r in data["rejected"]],
             ["canton", "reason", "n", "meaning"],
         ),
-        "\n## Runs\n",
+        "\n## Warnings (latest successful run per canton; rows are stored)\n",
+        _table(
+            [{**r, "meaning": WARNINGS.get(r["warning"], "")} for r in data["warnings"]],
+            ["canton", "warning", "n", "meaning"],
+        ),
+        "\n## Runs (times in UTC)\n",
         _table(
             data["runs"],
             [
