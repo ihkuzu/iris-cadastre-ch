@@ -128,6 +128,17 @@ location). `sql/examples.sql` has example queries (parcel under a point, coverag
 municipality) and the queries behind the findings in the quality report:
 `docker compose exec -T db psql -U iris -d iris_staging < sql/examples.sql`.
 
+Result of the run on 2026-10-28 (files in `docs/` and `results/`):
+
+| Canton | Parcels | Municipalities | Rejected | Area differs from `Flaeche` |
+|---|---|---|---|---|
+| AI Appenzell Innerrhoden | 9,143 | 5 | 0 | 0 |
+| BS Basel-Stadt | 24,426 | 3 | 0 | 0 |
+| FR Fribourg | 168,506 | 120 | 4 | 17,699 |
+| GE Genève | 73,111 | 45 | 0 | 0 |
+
+All validation checks pass; the Fribourg findings are explained in the quality report.
+
 ## Assumptions and limitations
 
 See the end of the [quality report](docs/quality_report.md) and [docs/report_notes.md](docs/report_notes.md).

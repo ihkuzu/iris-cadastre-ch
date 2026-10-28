@@ -1,0 +1,479 @@
+{
+  "generated": "2026-10-28T14:35:52+00:00",
+  "by_canton": [
+    {
+      "canton": "AI",
+      "canton_name": "Appenzell Innerrhoden",
+      "parcels": 9143,
+      "municipalities": 5,
+      "with_egrid": 9143,
+      "without_municipality": 0,
+      "repaired": 0,
+      "area_km2": "172.48",
+      "area_mismatch": 0,
+      "dataset_date": "2026-10-28",
+      "licence": "Frei erh\u00e4ltlich, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)",
+      "source_crs": "EPSG:2056"
+    },
+    {
+      "canton": "BS",
+      "canton_name": "Basel-Stadt",
+      "parcels": 24426,
+      "municipalities": 3,
+      "with_egrid": 24426,
+      "without_municipality": 0,
+      "repaired": 0,
+      "area_km2": "36.95",
+      "area_mismatch": 0,
+      "dataset_date": "2026-10-24",
+      "licence": "Frei erh\u00e4ltlich, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)",
+      "source_crs": "EPSG:2056"
+    },
+    {
+      "canton": "FR",
+      "canton_name": "Fribourg",
+      "parcels": 168506,
+      "municipalities": 120,
+      "with_egrid": 168281,
+      "without_municipality": 0,
+      "repaired": 0,
+      "area_km2": "1672.19",
+      "area_mismatch": 17699,
+      "dataset_date": "2026-10-28",
+      "licence": "Freie Nutzung, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)",
+      "source_crs": "EPSG:2056"
+    },
+    {
+      "canton": "GE",
+      "canton_name": "Gen\u00e8ve",
+      "parcels": 73111,
+      "municipalities": 45,
+      "with_egrid": 73111,
+      "without_municipality": 0,
+      "repaired": 0,
+      "area_km2": "282.49",
+      "area_mismatch": 0,
+      "dataset_date": "2026-10-03",
+      "licence": "Freie Nutzung, Quellenangabe Pflicht; SITG conditions d'utilisation",
+      "source_crs": "EPSG:2056"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "4409e012-5946-421b-8418-f001e42b1501",
+      "canton": "AI",
+      "source_file": "av_AI_gpkg_lv95.zip",
+      "sha256": "a94e14aed24d",
+      "status": "succeeded",
+      "read": 9143,
+      "accepted": 9143,
+      "inserted": 0,
+      "updated": 0,
+      "unchanged": 9143,
+      "rejected": 0,
+      "repaired": 0,
+      "not_in_source": 0,
+      "started": "2026-10-28 14:35",
+      "details": {
+        "licence": "Frei erh\u00e4ltlich, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)",
+        "mapping": {
+          "egrid": "EGRIS_EGRID",
+          "bfs_nr": "BFSNr",
+          "canton": "Kanton",
+          "nbident": "NBIdent",
+          "validity": "Gueltigkeit",
+          "completeness": "Vollstaendigkeit",
+          "parcel_number": "Nummer",
+          "area_source_m2": "Flaeche"
+        },
+        "reasons": {},
+        "warnings": {},
+        "source_crs": "EPSG:2056",
+        "dataset_date": "2026-10-28"
+      }
+    },
+    {
+      "run_id": "c82f7562-23d0-4b9c-afcd-1b2631d0927b",
+      "canton": "FR",
+      "source_file": "av_FR_gpkg_lv95.zip",
+      "sha256": "7030dd266e39",
+      "status": "succeeded",
+      "read": 168520,
+      "accepted": 168506,
+      "inserted": 168506,
+      "updated": 0,
+      "unchanged": 0,
+      "rejected": 4,
+      "repaired": 0,
+      "not_in_source": 0,
+      "started": "2026-10-28 14:34",
+      "details": {
+        "licence": "Freie Nutzung, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)",
+        "mapping": {
+          "egrid": "EGRIS_EGRID",
+          "bfs_nr": "BFSNr",
+          "canton": "Kanton",
+          "nbident": "NBIdent",
+          "validity": "Gueltigkeit",
+          "completeness": "Vollstaendigkeit",
+          "parcel_number": "Nummer",
+          "area_source_m2": "Flaeche"
+        },
+        "reasons": {
+          "duplicate_egrid": 2,
+          "conflicting_duplicate": 2
+        },
+        "warnings": {
+          "multipart_parcel": 4,
+          "egrid_shared_by_parts": 1605,
+          "area_differs_from_source": 17716
+        },
+        "source_crs": "EPSG:2056",
+        "dataset_date": "2026-10-28"
+      }
+    },
+    {
+      "run_id": "1a330203-d63c-48ab-8517-e34e0ed67ec0",
+      "canton": "GE",
+      "source_file": "av_GE_gpkg_lv95.zip",
+      "sha256": "2d79b08bccc7",
+      "status": "succeeded",
+      "read": 73111,
+      "accepted": 73111,
+      "inserted": 73111,
+      "updated": 0,
+      "unchanged": 0,
+      "rejected": 0,
+      "repaired": 0,
+      "not_in_source": 0,
+      "started": "2026-10-28 14:32",
+      "details": {
+        "licence": "Freie Nutzung, Quellenangabe Pflicht; SITG conditions d'utilisation",
+        "mapping": {
+          "egrid": "EGRIS_EGRID",
+          "bfs_nr": "BFSNr",
+          "canton": "Kanton",
+          "nbident": "NBIdent",
+          "validity": "Gueltigkeit",
+          "completeness": "Vollstaendigkeit",
+          "parcel_number": "Nummer",
+          "area_source_m2": "Flaeche"
+        },
+        "reasons": {},
+        "warnings": {},
+        "source_crs": "EPSG:2056",
+        "dataset_date": "2026-10-03"
+      }
+    },
+    {
+      "run_id": "381cc79d-7884-4840-9093-791eb2ab845d",
+      "canton": "BS",
+      "source_file": "av_BS_gpkg_lv95.zip",
+      "sha256": "5c9602a619d6",
+      "status": "succeeded",
+      "read": 24426,
+      "accepted": 24426,
+      "inserted": 24426,
+      "updated": 0,
+      "unchanged": 0,
+      "rejected": 0,
+      "repaired": 0,
+      "not_in_source": 0,
+      "started": "2026-10-28 14:31",
+      "details": {
+        "licence": "Frei erh\u00e4ltlich, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)",
+        "mapping": {
+          "egrid": "EGRIS_EGRID",
+          "bfs_nr": "BFSNr",
+          "canton": "Kanton",
+          "nbident": "NBIdent",
+          "validity": "Gueltigkeit",
+          "completeness": "Vollstaendigkeit",
+          "parcel_number": "Nummer",
+          "area_source_m2": "Flaeche"
+        },
+        "reasons": {},
+        "warnings": {},
+        "source_crs": "EPSG:2056",
+        "dataset_date": "2026-10-24"
+      }
+    },
+    {
+      "run_id": "6475139f-3c51-49be-85a5-44405bd0b8d5",
+      "canton": "AI",
+      "source_file": "av_AI_gpkg_lv95.zip",
+      "sha256": "a94e14aed24d",
+      "status": "succeeded",
+      "read": 9143,
+      "accepted": 9143,
+      "inserted": 9143,
+      "updated": 0,
+      "unchanged": 0,
+      "rejected": 0,
+      "repaired": 0,
+      "not_in_source": 0,
+      "started": "2026-10-28 14:31",
+      "details": {
+        "licence": "Frei erh\u00e4ltlich, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)",
+        "mapping": {
+          "egrid": "EGRIS_EGRID",
+          "bfs_nr": "BFSNr",
+          "canton": "Kanton",
+          "nbident": "NBIdent",
+          "validity": "Gueltigkeit",
+          "completeness": "Vollstaendigkeit",
+          "parcel_number": "Nummer",
+          "area_source_m2": "Flaeche"
+        },
+        "reasons": {},
+        "warnings": {},
+        "source_crs": "EPSG:2056",
+        "dataset_date": "2026-10-28"
+      }
+    }
+  ],
+  "rejected": [
+    {
+      "canton": "FR",
+      "reason": "conflicting_duplicate",
+      "n": 2
+    },
+    {
+      "canton": "FR",
+      "reason": "duplicate_egrid",
+      "n": 2
+    }
+  ],
+  "checks": [
+    {
+      "invalid_geometries": 0,
+      "wrong_srid": 0,
+      "empty_geometries": 0,
+      "duplicate_keys": 0,
+      "egrids_on_two_parcels": 0,
+      "wrong_country": 0
+    }
+  ],
+  "sample": [
+    {
+      "canton": "AI",
+      "bfs_nr": 3102,
+      "municipality": "Gonten",
+      "nbident": "AI02003102",
+      "parcel_number": "412",
+      "egrid": "CH595977054157",
+      "area_m2": "12880.26",
+      "lon": "9.381817",
+      "lat": "47.341074"
+    },
+    {
+      "canton": "AI",
+      "bfs_nr": 3112,
+      "municipality": "Schwende-R\u00fcte",
+      "nbident": "AI02003103",
+      "parcel_number": "2070",
+      "egrid": "CH995977594150",
+      "area_m2": "555.81",
+      "lon": "9.417465",
+      "lat": "47.329493"
+    },
+    {
+      "canton": "AI",
+      "bfs_nr": 3104,
+      "municipality": "Schlatt-Haslen",
+      "nbident": "AI02003104",
+      "parcel_number": "877",
+      "egrid": "CH367702107919",
+      "area_m2": "899.94",
+      "lon": "9.412721",
+      "lat": "47.362384"
+    },
+    {
+      "canton": "AI",
+      "bfs_nr": 3112,
+      "municipality": "Schwende-R\u00fcte",
+      "nbident": "AI02003105",
+      "parcel_number": "711",
+      "egrid": "CH167759413807",
+      "area_m2": "168.38",
+      "lon": "9.433694",
+      "lat": "47.305269"
+    },
+    {
+      "canton": "AI",
+      "bfs_nr": 3111,
+      "municipality": "Oberegg",
+      "nbident": "AI02003111",
+      "parcel_number": "1093",
+      "egrid": "CH541799778868",
+      "area_m2": "2421.28",
+      "lon": "9.569568",
+      "lat": "47.429346"
+    },
+    {
+      "canton": "BS",
+      "bfs_nr": 2701,
+      "municipality": "Basel",
+      "nbident": "BSS100000000",
+      "parcel_number": "0973",
+      "egrid": "CH876778858989",
+      "area_m2": "526.76",
+      "lon": "7.578188",
+      "lat": "47.560827"
+    },
+    {
+      "canton": "BS",
+      "bfs_nr": 2701,
+      "municipality": "Basel",
+      "nbident": "BSS200000000",
+      "parcel_number": "9056",
+      "egrid": "CH567989671673",
+      "area_m2": "2016.63",
+      "lon": "7.564042",
+      "lat": "47.554448"
+    },
+    {
+      "canton": "BS",
+      "bfs_nr": 2701,
+      "municipality": "Basel",
+      "nbident": "BSS300000000",
+      "parcel_number": "1539",
+      "egrid": "CH576778688948",
+      "area_m2": "186.49",
+      "lon": "7.585352",
+      "lat": "47.542896"
+    },
+    {
+      "canton": "BS",
+      "bfs_nr": 2701,
+      "municipality": "Basel",
+      "nbident": "BSS500000000",
+      "parcel_number": "1826",
+      "egrid": "CH127954896752",
+      "area_m2": "296.31",
+      "lon": "7.608795",
+      "lat": "47.546360"
+    },
+    {
+      "canton": "BS",
+      "bfs_nr": 2701,
+      "municipality": "Basel",
+      "nbident": "BSS700000000",
+      "parcel_number": "0541",
+      "egrid": "CH907067888949",
+      "area_m2": "3838.18",
+      "lon": "7.597322",
+      "lat": "47.571502"
+    },
+    {
+      "canton": "FR",
+      "bfs_nr": 2041,
+      "municipality": "Saint-Aubin (FR)",
+      "nbident": "FR204111",
+      "parcel_number": "506",
+      "egrid": "CH749410972682",
+      "area_m2": "10883.46",
+      "lon": "6.971862",
+      "lat": "46.901577"
+    },
+    {
+      "canton": "FR",
+      "bfs_nr": 2125,
+      "municipality": "Bulle",
+      "nbident": "FR212511",
+      "parcel_number": "6141",
+      "egrid": "CH783010948875",
+      "area_m2": "6.00",
+      "lon": "7.066091",
+      "lat": "46.611301"
+    },
+    {
+      "canton": "FR",
+      "bfs_nr": 2129,
+      "municipality": "Corbi\u00e8res",
+      "nbident": "FR212911",
+      "parcel_number": "3105",
+      "egrid": "CH538573014084",
+      "area_m2": "200.10",
+      "lon": "7.107417",
+      "lat": "46.645113"
+    },
+    {
+      "canton": "FR",
+      "bfs_nr": 2121,
+      "municipality": "Haut-Intyamon",
+      "nbident": "FR214212",
+      "parcel_number": "470b",
+      "egrid": "CH749410897260",
+      "area_m2": "3182.33",
+      "lon": "7.015200",
+      "lat": "46.467601"
+    },
+    {
+      "canton": "FR",
+      "bfs_nr": 2309,
+      "municipality": "W\u00fcnnewil-Flamatt",
+      "nbident": "FR230911",
+      "parcel_number": "1625",
+      "egrid": "CH649410827119",
+      "area_m2": "481.58",
+      "lon": "7.274330",
+      "lat": "46.874503"
+    },
+    {
+      "canton": "GE",
+      "bfs_nr": 6612,
+      "municipality": "Ch\u00eane-Bougeries",
+      "nbident": "GE0100000012",
+      "parcel_number": "1524",
+      "egrid": "CH916367658239",
+      "area_m2": "2311.31",
+      "lon": "6.194270",
+      "lat": "46.203354"
+    },
+    {
+      "canton": "GE",
+      "bfs_nr": 6616,
+      "municipality": "Collonge-Bellerive",
+      "nbident": "GE0100000016",
+      "parcel_number": "7013",
+      "egrid": "CH508063136506",
+      "area_m2": "1022.10",
+      "lon": "6.209403",
+      "lat": "46.244824"
+    },
+    {
+      "canton": "GE",
+      "bfs_nr": 6621,
+      "municipality": "Gen\u00e8ve",
+      "nbident": "GE0100000021",
+      "parcel_number": "6367",
+      "egrid": "CH136582635887",
+      "area_m2": "73.97",
+      "lon": "6.132939",
+      "lat": "46.206558"
+    },
+    {
+      "canton": "GE",
+      "bfs_nr": 6633,
+      "municipality": "Plan-les-Ouates",
+      "nbident": "GE0100000036",
+      "parcel_number": "7120",
+      "egrid": "CH529752656309",
+      "area_m2": "118.51",
+      "lon": "6.117497",
+      "lat": "46.168542"
+    },
+    {
+      "canton": "GE",
+      "bfs_nr": 6634,
+      "municipality": "Pregny-Chamb\u00e9sy",
+      "nbident": "GE0100000037",
+      "parcel_number": "766",
+      "egrid": "CH168265639583",
+      "area_m2": "1211.40",
+      "lon": "6.132078",
+      "lat": "46.242925"
+    }
+  ]
+}
