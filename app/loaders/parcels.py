@@ -245,6 +245,7 @@ def _drop_egrid_clashes(conn, parcels, rows: list[dict], result: Result, parts: 
                     "source_attributes": r["source_attributes"],
                     "geometry_wkt": to_shape(r["geom"]).wkt,
                     "reason": "egrid_already_stored",
+                    "key": (r["nbident"], r["parcel_number"]),
                     "detail": "/".join(owner),
                 }
             )

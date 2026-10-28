@@ -30,8 +30,9 @@ docker compose run --rm app validate                # exit code 1 if a check fai
 
 Running `ingest` again on unchanged data changes no parcel content (`inserted 0, updated 0,
 unchanged N`); it adds an entry to `ingestion_runs` and sets `last_seen_run_id`. A new export
-with the same content is also unchanged, since the export date is not part of the record hash. `download` keeps a file that is
-already there (geodienste.ch allows one download per dataset and day); `--force` fetches it again.
+with the same content is also unchanged, since the export date is not part of the record hash.
+`download` keeps a file that is already there (geodienste.ch allows one download per dataset and
+day); `--force` fetches it again.
 
 Updating an existing database after a schema change: `docker compose down -v` removes only this
 project's PostGIS volume (`iris_cadastre_ch_pg`), then `up -d db` and `init-db` again.
@@ -134,8 +135,10 @@ canton and file, to `logs/ingest.jsonl`.
 `results/summary.json` and `results/sample_parcels.csv` from the database: coverage per canton,
 integrity checks, rejected records by reason, runs and sample rows. `sql/validation.sql` holds the
 acceptance checks (valid geometries, SRIDs, unique keys, one parcel per EGRID, provenance,
-location); it is run by `main.py validate`, which fills in the cantons with `egrid_parts`. `sql/examples.sql` has example queries (parcel under a point, coverage per
-municipality) and the queries behind the findings in the quality report:
+location); it is run by `main.py validate`, which fills in the cantons with `egrid_parts`; the
+output of the real run is in `results/validate_output.txt`. `sql/examples.sql` has example
+queries (parcel under a point, coverage per municipality) and the queries behind the findings in
+the quality report (output in `results/examples_output.txt`):
 `docker compose exec -T db psql -U iris -d iris_staging < sql/examples.sql`.
 
 Result of the run on 2026-10-28 (files in `docs/` and `results/`):
@@ -166,6 +169,10 @@ the container test in CI; it is rebuilt with `fixtures.geodienste(path, parts=Tr
 cadastre data, and the loader refuses to put it into the main staging schema.
 
 ## Layout
+
+The layout follows the IRIS base repository (`iris-sample`: `app/config`, `database`,
+`extractors`, `parsers`, `transformers`, `loaders`, `runners`, Alembic, loguru), but every write goes
+to `iris_staging`, never to `iris_core`.
 
 ```
 app/extractors   read files, pick layers, hash        app/loaders     upsert, runs, rejections

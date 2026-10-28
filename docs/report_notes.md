@@ -49,6 +49,9 @@
   digitised, which is the likely cause. Both values are stored, the difference is reported and
   nothing is corrected. `sql/examples.sql` (queries 7 to 9) lists them; the output of the real
   run is in `results/examples_output.txt`.
+- The two earlier FR runs in `results/summary.json` count 17,704 area differences; they were made
+  before the count was switched to exact decimals, like the report SQL. The final run on the same
+  file counts 17,699, the same as the coverage table.
 - 225 Fribourg parcels have no EGRID; they are stored, the EGRID is optional in the model.
 - All parcels are `vollstaendig` and `rechtskraeftig`; the source has no incomplete or pending
   parcels in the `resf` layer.

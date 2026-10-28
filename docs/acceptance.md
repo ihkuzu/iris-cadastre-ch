@@ -10,7 +10,7 @@ where it is met. "Evidence" points to a file, a test or a command whose output c
 | Task-specific workflow with documented source data, stable identifiers and reproducible inputs or fixtures | One configured source per canton (`config/sources.toml`) with URL, licence and access date; the downloaded file's SHA-256 is stored with every run; the natural key is canton + NBIdent + parcel number, EGRID is kept and checked to belong to one land register parcel | `config/sources.toml`, table `ingestion_runs`, `tests/test_transform.py` |
 | Resolve lawful access, canton/parcel references, source CRS and projected geometry with provenance | Only sources marked open in the config are ingested; each row carries canton, NBIdent, number, EGRID, BFS number, source CRS, licence, source URL and file hash; geometry kept in LV95 (EPSG:2056) with a WGS84 copy | README "Data provenance", columns of `cadastre_switzerland` |
 | Normalise fields, timestamps, units and spatial metadata; repeatable staging-only ingestion without data loss | Canonical column names, UTC timestamps, areas in m², every original attribute kept in `source_attributes`; re-running the same file changes nothing; rejected rows are stored with a reason instead of being dropped; writes are refused outside an `iris_staging*` schema | `tests/test_load.py::test_second_run_changes_nothing_and_a_change_updates_one_row`, `tests/test_load.py::test_refuses_iris_core_synthetic_main_and_closed_sources` |
-| Source-aware logging, fault handling and tests for missing, malformed or duplicate records | Logs carry run id, canton and file; reason codes for every rejection; tests for missing keys, invalid and empty geometry, wrong CRS, exact and conflicting duplicates | `tests/test_transform.py`, `logs/` |
+| Source-aware logging, fault handling and tests for missing, malformed or duplicate records | Logs carry run id, canton and file; reason codes for every rejection; tests for missing keys, invalid and empty geometry, wrong CRS, exact and conflicting duplicates | `tests/test_transform.py`, `logs/ingest.jsonl` (written at run time) |
 | Representative validated result and concise quality report on coverage, assumptions and known gaps | `python main.py report` writes the report from the database; validation SQL checks rows present, keys, EGRIDs, SRID, validity, areas, provenance and location; `sql/examples.sql` holds the queries behind the findings | `docs/quality_report.md`, `sql/validation.sql`, `results/`, `results/examples_output.txt` |
 
 ## What to submit
@@ -33,6 +33,15 @@ where it is met. "Evidence" points to a file, a test or a command whose output c
 | No invented polygons passed off as live cadastre | Test fixtures are generated in code, use the canton code `XX`, EGRIDs starting `CH9999` and the source name `SYNTHETIC test fixture`; the loader refuses synthetic sources unless the target is a test schema |
 | Preserve canton and national metadata | `canton`, `bfs_nr`, `municipality`, `nbident`, `egrid` and `country = 'CH'` on every row |
 | Deterministic or auditable method with clear evidence | Rows are processed in key order; a record hash decides updates; each run stores file hash, counts and reasons |
+
+## Candidate notes
+
+| Note | How it is met |
+|---|---|
+| Verified and lawfully accessible data | geodienste.ch AV offer, access conditions checked per canton (`docs/sources.md`); only open sources are downloaded or loaded |
+| Track country, licensing and native CRS | Columns `country`, `licence`, `licence_url`, `source_crs` on every row |
+| Document reprojection limits | `docs/report_notes.md`, Known gaps (LV03 without the FINELTRA grid, WGS84 copy for display only) |
+| Clearly label synthetic fixtures | Canton `XX`, EGRIDs `CH9999…`, note `SYNTHETIC test fixture`; refused under a real canton and in the main schema |
 
 ## From the email
 

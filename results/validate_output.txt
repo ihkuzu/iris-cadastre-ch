@@ -1,0 +1,11 @@
+# Output of `docker compose run --rm app validate` after the final run of 2026-10-28 (real data, four cantons)
+ok   table is not empty: 0
+ok   geometries are valid: 0
+ok   geometries are LV95 and WGS84: 0
+ok   areas are positive and match the geometry: 0
+ok   parcel keys are unique: 0
+ok   EGRIDs are well formed: 0
+ok   each EGRID belongs to one parcel: 0
+ok   canton and country set: 0
+ok   provenance complete: 0
+ok   WGS84 copy lies in Switzerland: 0
