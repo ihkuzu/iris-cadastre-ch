@@ -250,3 +250,14 @@ def test_a_new_export_with_the_same_content_has_the_same_hash(tmp_gpkg, settings
     a, b = transform(first, source, settings), transform(later, source, settings)
     assert [r["record_hash"] for r in a.rows] == [r["record_hash"] for r in b.rows]
     assert b.rows[0]["source_dataset_date"] == "2030-01-01"
+
+
+def test_area_tolerance_boundary_matches_the_sql(settings):
+    from app.transformers.parcels import area_differs
+
+    assert not area_differs(101.0, 100.0, settings)  # exactly 1 m2 is within the tolerance
+    assert area_differs(101.01, 100.0, settings)
+    assert not area_differs(1105.5, 1100.0, settings)  # exactly 0.5 %
+    assert area_differs(1105.51, 1100.0, settings)
+    # plain floats call this one a difference, the SQL in numeric does not
+    assert not area_differs(205.02, 204.0, settings)

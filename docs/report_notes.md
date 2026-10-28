@@ -27,8 +27,8 @@
 ## Findings from the real data (run of 2026-10-28)
 
 - 275,186 parcels from four cantons are in staging; every integrity check passes. AI, BS and GE
-  load without a single rejection, repair or area difference, and a second run of the same file
-  writes nothing (`inserted 0, updated 0, unchanged 9143` for AI).
+  load without a single rejection, repair or area difference. A second run of the same file
+  changes nothing (`inserted 0, updated 0, unchanged 168506` for FR, the largest canton).
 - Fribourg: 168,520 features = 168,506 stored rows + 4 held back (below) + 10 merged. The 10
   are extra polygons of 4 parcels that the source splits into separate features with one key;
   each of the 4 is stored once as a MultiPolygon (`multipart_parcel`, `merged_parts` in the run).

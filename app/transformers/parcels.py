@@ -9,6 +9,7 @@ import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 import geopandas as gpd
 import numpy as np
@@ -168,6 +169,15 @@ def _names(extract: Extract) -> dict[int, str]:
     return {int(b): _text(n) for b, n in pairs.itertuples(index=False)}
 
 
+def area_differs(area: float, stated: float | None, settings) -> bool:
+    """Same test as the report's SQL, in exact decimals, so both count the same parcels."""
+    if stated is None:
+        return False
+    a, b = Decimal(str(area)), Decimal(str(stated))
+    tol = max(Decimal(str(settings.area_tolerance_m2)), Decimal(str(settings.area_tolerance_share)) * b)
+    return abs(a - b) > tol
+
+
 def _refuse_synthetic(frame: gpd.GeoDataFrame, source: Source) -> None:
     """Test fixtures must never be stored as a real canton."""
     for col in frame.columns:
@@ -286,10 +296,7 @@ def transform(extract: Extract, source: Source, settings) -> Result:
         out.repaired += repaired
     _dedupe(candidates, out, source.egrid_parts)
     for row in out.rows:
-        src = row["area_source_m2"]
-        if src is not None and abs(row["area_m2"] - src) > max(
-            settings.area_tolerance_m2, settings.area_tolerance_share * src
-        ):
+        if area_differs(row["area_m2"], row["area_source_m2"], settings):
             out.warnings["area_differs_from_source"] += 1
     log.info(
         "read {} features: {} accepted, {} rejected, {} repaired",
