@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
@@ -25,7 +25,7 @@ jobs:
       IRIS_TEST_DATABASE_URL: postgresql+psycopg://iris:iris@localhost:5432/iris_test
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -37,7 +37,7 @@ jobs:
         run: IRIS_DATABASE_URL=$IRIS_TEST_DATABASE_URL alembic upgrade head
 
   docker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - run: mkdir -p results && echo "IRIS_UID=$(id -u)" >> .env && echo "IRIS_GID=$(id -g)" >> .env
