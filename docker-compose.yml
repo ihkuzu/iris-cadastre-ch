@@ -19,6 +19,8 @@ services:
 
   app:
     build: .
+    # run as your own user so files written to the mounted folders stay yours (set IRIS_UID/IRIS_GID on Linux)
+    user: "${IRIS_UID:-1000}:${IRIS_GID:-1000}"
     depends_on:
       db:
         condition: service_healthy

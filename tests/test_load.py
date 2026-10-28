@@ -87,6 +87,12 @@ def test_rejections_are_stored_not_dropped(eng, tmp_gpkg, settings, source):
         == 1
     )
     assert count(eng, "SELECT (details->'reasons'->>'conflicting_duplicate')::int FROM S.ingestion_runs") == 2
+    # the stored WKT is the whole source geometry, not a cut-off string
+    from shapely import wkt
+
+    spike = next(r for r in fixtures.broken() if r["Nummer"] == "205")["geometry"]
+    stored = count(eng, "SELECT geometry_wkt FROM S.rejected_records WHERE reason = 'invalid_geometry'")
+    assert wkt.loads(stored).equals_exact(spike, 1e-6)
 
 
 def test_egrid_stored_under_another_key_is_rejected(eng, tmp_gpkg, settings, source):
@@ -162,3 +168,14 @@ def test_an_egrid_may_move_to_another_parcel_in_a_new_file(eng, tmp_gpkg, tmp_pa
     later = fixtures.write(tmp_path / "later.gpkg", rows)
     stats = ingest(eng, later, settings, source, layer="Liegenschaften_Liegenschaft")
     assert (stats.updated, stats.rejected) == (2, 0)
+
+
+def test_report_and_run_count_the_same_area_differences(eng, tmp_gpkg, settings, source):
+    rows = fixtures.parcels(3)
+    for r in rows[:2]:
+        r["Flaechenmass"] = 500.0  # the squares have 400 m2
+    fixtures.write(tmp_gpkg, rows)
+    ingest(eng, tmp_gpkg, settings, source, layer="Liegenschaften_Liegenschaft")
+    data = quality.gather(eng, SCHEMA, "cadastre_switzerland")
+    warned = {r["warning"]: r["n"] for r in data["warnings"]}
+    assert data["by_canton"][0]["area_mismatch"] == warned["area_differs_from_source"] == 2

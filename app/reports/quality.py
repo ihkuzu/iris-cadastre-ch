@@ -28,17 +28,24 @@ REASONS = {
 WARNINGS = {
     "multipart_parcel": "several polygons of one parcel merged into one MultiPolygon",
     "egrid_shared_by_parts": "numbered part <article>.<nn> sharing the EGRID of its parcel",
-    "area_differs_from_source": "computed area differs from Flaeche by more than 1 m2 and 0.5 %",
+    "area_differs_from_source": "computed area differs from Flaeche by more than the tolerance",
+    "egrid_moved": "EGRID now on another parcel of this file, taken over from the stored one",
     "no_municipality": "no BFS number in the row or the boundary layer",
-    "nbident_without_canton_prefix": "NBIdent does not start with the canton code",
     "crs_from_config": "file had no CRS, the configured one was used",
     "reprojected_from_lv03": "LV03 input reprojected to LV95",
 }
 
 
-def gather(engine: Engine, schema: str, table: str, tol_m2: float = 1.0, tol_share: float = 0.005) -> dict:
+def gather(
+    engine: Engine,
+    schema: str,
+    table: str,
+    tol_m2: float = 1.0,
+    tol_share: float = 0.005,
+    parts: list[str] | None = None,
+) -> dict:
     check_schema(schema)
-    tol = {"m2": float(tol_m2), "share": float(tol_share)}
+    tol = {"m2": float(tol_m2), "share": float(tol_share), "parts": list(parts or [])}
     q = lambda sql: [dict(r._mapping) for r in conn.execute(text(sql.format(s=schema, t=table)), tol)]  # noqa: E731
     with engine.connect() as conn:
         return {
@@ -72,7 +79,8 @@ def gather(engine: Engine, schema: str, table: str, tol_m2: float = 1.0, tol_sha
                 count(*) - count(DISTINCT (canton, nbident, parcel_number)) AS duplicate_keys,
                 (SELECT count(*) FROM (SELECT egrid FROM "{s}".{t} WHERE egrid IS NOT NULL GROUP BY egrid
                     HAVING count(DISTINCT (canton, nbident,
-                        CASE WHEN canton = 'FR' THEN split_part(parcel_number, '.', 1) ELSE parcel_number END)) > 1) e)
+                        CASE WHEN canton = ANY(CAST(:parts AS text[]))
+                        THEN split_part(parcel_number, '.', 1) ELSE parcel_number END)) > 1) e)
                     AS egrids_on_two_parcels,
                 count(*) FILTER (WHERE country <> 'CH') AS wrong_country
                 FROM "{s}".{t}"""),
@@ -156,6 +164,7 @@ def write(data: dict, report: Path, results: Path, notes: Path | None = None) ->
                 "unchanged",
                 "rejected",
                 "repaired",
+                "not_in_source",
             ],
         ),
         "\n## Sample rows\n\n",

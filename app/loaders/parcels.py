@@ -164,6 +164,7 @@ def load(engine: Engine, schema: str, table: str, result: Result, extract: Extra
                     repaired=result.repaired,
                     details={
                         "reasons": dict(result.reasons),
+                        "merged_parts": result.merged,
                         "warnings": dict(result.warnings),
                         "mapping": result.mapping,
                         "source_crs": result.source_crs,
@@ -205,7 +206,10 @@ def _drop_egrid_clashes(conn, parcels, rows: list[dict], result: Result, parts: 
             taken[e] = (c, n, p)
     # a stored parcel that comes with another EGRID in this file gives its old EGRID up
     now = {(r["canton"], r["nbident"], r["parcel_number"]): r["egrid"] for r in result.rows}
-    taken = {e: o for e, o in taken.items() if now.get(o, e) == e}
+    moved = {e for e, o in taken.items() if now.get(o, e) != e}
+    if moved:
+        result.warnings["egrid_moved"] += len(moved)
+    taken = {e: o for e, o in taken.items() if e not in moved}
     keep = []
     for r in rows:
         owner = taken.get(r["egrid"]) if r["egrid"] else None

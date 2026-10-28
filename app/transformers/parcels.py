@@ -36,6 +36,8 @@ class Result:
     warnings: Counter = field(default_factory=Counter)
     read: int = 0
     repaired: int = 0
+    # features folded into another row as parts of one parcel; read = rows + rejected + merged
+    merged: int = 0
     source_crs: str = ""
     mapping: dict[str, str] = field(default_factory=dict)
 
@@ -166,6 +168,15 @@ def _names(extract: Extract) -> dict[int, str]:
     return {int(b): _text(n) for b, n in pairs.itertuples(index=False)}
 
 
+def _refuse_synthetic(frame: gpd.GeoDataFrame, source: Source) -> None:
+    """Test fixtures must never be stored as a real canton."""
+    for col in frame.columns:
+        if col != "geometry" and (pd.api.types.is_string_dtype(frame[col]) or frame[col].dtype == object):
+            hit = frame[col].astype(str).str.contains("SYNTHETIC", case=False, na=False)
+            if hit.any():
+                raise ValueError(f"{source.canton}: column {col} marks rows as synthetic test data; refused")
+
+
 def transform(extract: Extract, source: Source, settings) -> Result:
     frame = extract.frame
     out = Result(read=len(frame))
@@ -174,6 +185,8 @@ def transform(extract: Extract, source: Source, settings) -> Result:
     missing = [k for k in REQUIRED if k not in out.mapping]
     if missing:
         raise ValueError(f"required columns not found: {', '.join(missing)}; mapping: {out.mapping}")
+    if not source.synthetic:
+        _refuse_synthetic(frame, source)
     epsg, assumed = _epsg(frame, source)
     if assumed:
         out.warnings["crs_from_config"] += 1
@@ -236,7 +249,9 @@ def transform(extract: Extract, source: Source, settings) -> Result:
             )
             continue
         if not source.synthetic and not nbident.upper().startswith(source.canton):
-            out.warnings["nbident_without_canton_prefix"] += 1
+            # NBIdent always starts with the canton code, so this row is not from this canton
+            out.rejected.append({**_wkt(dict(reject)), "reason": "canton_mismatch", "detail": f"NBIdent {nbident}"})
+            continue
         area_src = _number(feature[m["area_source_m2"]]) if "area_source_m2" in m else None
         bfs = _number(feature[m["bfs_nr"]]) if "bfs_nr" in m else None
         name = _text(feature[m["municipality"]]) if "municipality" in m else None
@@ -311,7 +326,14 @@ def _merge_parts(group: list) -> tuple[dict, MultiPolygon, dict] | None:
         source_feature_id=",".join(r["source_feature_id"] for r, _, _ in group),
         source_attributes={"parts": [r["source_attributes"] for r, _, _ in group]},
     )
-    return row, merged, group[0][2]
+    # if the merged parcel is rejected later, the reject keeps every part
+    reject = {
+        **group[0][2],
+        "source_feature_id": row["source_feature_id"],
+        "source_attributes": row["source_attributes"],
+        "geom": merged,
+    }
+    return row, merged, reject
 
 
 def _dedupe(candidates, out: Result, parts: bool = False) -> None:
@@ -336,6 +358,7 @@ def _dedupe(candidates, out: Result, parts: bool = False) -> None:
                     out.rejected.append({**_wkt(reject), "reason": "conflicting_duplicate", "detail": "/".join(key)})
                 continue
             out.warnings["multipart_parcel"] += 1
+            out.merged += len(unique) - 1
             unique = [merged]
         kept.append(unique[0])
     # one EGRID may cover several numbered parts of the same land register parcel, nothing else

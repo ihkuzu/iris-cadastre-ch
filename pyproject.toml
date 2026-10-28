@@ -5,6 +5,20 @@ description = "Ingest Swiss official cadastral survey (AV) parcel geometries int
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
+dynamic = ["dependencies"]
+
+[project.scripts]
+iris-cadastre-ch = "app.runners.cli:run"
+
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
 
 [tool.ruff]
 line-length = 120

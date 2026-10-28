@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: mkdir -p data logs results && chmod 777 data logs results docs
+      - run: mkdir -p results && echo "IRIS_UID=$(id -u)" >> .env && echo "IRIS_GID=$(id -g)" >> .env
       - run: docker compose build
       - run: docker compose up -d db
       - run: docker compose run --rm app init-db
@@ -54,6 +54,9 @@ jobs:
           grep -q "inserted 0, updated 0, unchanged 5" second.txt
           $RUN report --no-notes --out results/ci_report.md --results results/ci
           $RUN validate
+          sed 's/iris_staging\./iris_staging_ci./g' sql/examples.sql | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U iris -d iris_staging > /dev/null
+      - name: report with the default paths, overwriting the tracked report as the runner user
+        run: docker compose run --rm app report
       - name: validate must fail on the empty main staging table
         run: "! docker compose run --rm app validate"
       - run: docker compose down -v

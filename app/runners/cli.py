@@ -141,8 +141,15 @@ def cmd_report(args, settings) -> int:
         settings.table,
         settings.area_tolerance_m2,
         settings.area_tolerance_share,
+        _parts_cantons(settings),
     )
-    notes = None if args.no_notes else ROOT / "docs" / "report_notes.md"
+    # the findings in report_notes.md describe the real run, so test schemas and synthetic data leave them out
+    real = (
+        settings.db_schema == "iris_staging"
+        and data["by_canton"]
+        and all(r["canton"] != "XX" for r in data["by_canton"])
+    )
+    notes = None if args.no_notes or not real else ROOT / "docs" / "report_notes.md"
     quality.write(data, _root(args.out), _root(args.results), notes)
     print(f"wrote {args.out} and {args.results}/")
     return 0
@@ -155,10 +162,14 @@ def cmd_validate(args, settings) -> int:
     sql = sql.replace("iris_staging.", f"{settings.db_schema}.")
     failed = 0
     with engine(settings.database_url).connect() as conn:
-        for row in conn.execute(text(sql)):
+        for row in conn.execute(text(sql), {"parts": _parts_cantons(settings)}):
             print(f"{'ok  ' if row.passed else 'FAIL'} {row.check_name}: {row.found}")
             failed += not row.passed
     return 1 if failed else 0
+
+
+def _parts_cantons(settings) -> list[str]:
+    return sorted(c for c, s in load_sources(settings.sources_file).items() if s.egrid_parts)
 
 
 def _root(value: str) -> Path:
@@ -208,3 +219,11 @@ def main(argv: list[str] | None = None) -> int:
         # missing files, no write access to data/ or logs/, network errors during download
         print(f"error: {error}", file=sys.stderr)
         return 2
+    except Exception as error:
+        print(f"unexpected error: {type(error).__name__}: {error}; details in logs/ingest.jsonl", file=sys.stderr)
+        logger.opt(exception=error).debug("unexpected error")
+        return 1
+
+
+def run() -> None:
+    sys.exit(main())

@@ -15,8 +15,7 @@ geodienste.ch GeoPackage ──> extract ──> map fields ──> check & norm
 
 ```
 cp .env.example .env
-# Linux only, if your user id is not 1000: let the container user write the mounted folders
-# mkdir -p data logs results && chmod a+w data logs results docs
+# Linux only, if your user id is not 1000: set IRIS_UID and IRIS_GID in .env to `id -u` and `id -g`
 docker compose up -d db                     # own PostGIS on 127.0.0.1:5434, nothing else
 docker compose run --rm app init-db         # create schema and tables
 
@@ -36,8 +35,8 @@ already there (geodienste.ch allows one download per dataset and day); `--force`
 
 Updating an existing database after a schema change: `docker compose down -v` removes only this
 project's PostGIS volume (`iris_cadastre_ch_pg`), then `up -d db` and `init-db` again.
-The container runs as uid 1000 and writes to the bind-mounted `data/`, `logs/`, `results/` and
-`docs/`; on Linux with another user id, use the `chmod` line above.
+The container writes to the bind-mounted `data/`, `logs/`, `results/` and `docs/` as the user in
+`IRIS_UID`/`IRIS_GID` (default 1000), so on Linux the files stay owned by you.
 
 ## Local run and tests
 
@@ -165,7 +164,8 @@ app/extractors   read files, pick layers, hash        app/loaders     upsert, ru
 app/parsers      column name mapping                   app/reports     quality report
 app/transformers checks, CRS, geometry, duplicates     app/runners     command line
 app/database     tables, staging guard                 config/         sources and licences
-alembic/         migration                             sql/            validation queries
+alembic/         migration                             sql/            validation and example queries
+tests/           tests and synthetic fixtures          docs/           sources, acceptance, quality report
 ```
 
 ## Licence

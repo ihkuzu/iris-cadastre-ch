@@ -6,7 +6,7 @@
 
 -- rejected records of the latest successful run per canton only, so reruns are not counted twice
 CREATE TEMP VIEW latest_rejects AS
-SELECT r.* FROM latest_rejects r
+SELECT r.* FROM iris_staging.rejected_records r
 WHERE r.run_id IN (SELECT DISTINCT ON (canton) run_id FROM iris_staging.ingestion_runs
                    WHERE status = 'succeeded' ORDER BY canton, started_at DESC);
 

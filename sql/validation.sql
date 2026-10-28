@@ -18,10 +18,11 @@ UNION ALL
 SELECT 'EGRIDs are well formed', count(*), count(*) = 0
   FROM iris_staging.cadastre_switzerland WHERE egrid !~ '^CH[0-9A-Z]{12}$'
 UNION ALL
--- an EGRID belongs to one land register parcel; in FR (egrid_parts) its parts <article>.<nn> share it
+-- an EGRID belongs to one land register parcel; in cantons with egrid_parts its parts <article>.<nn> share it
+-- :parts is the list of those cantons from config/sources.toml, passed in by `main.py validate`
 SELECT 'each EGRID belongs to one parcel', count(*), count(*) = 0
   FROM (SELECT egrid FROM iris_staging.cadastre_switzerland WHERE egrid IS NOT NULL GROUP BY egrid
-        HAVING count(DISTINCT (canton, nbident, CASE WHEN canton = 'FR' THEN split_part(parcel_number, '.', 1) ELSE parcel_number END)) > 1) e
+        HAVING count(DISTINCT (canton, nbident, CASE WHEN canton = ANY(CAST(:parts AS text[])) THEN split_part(parcel_number, '.', 1) ELSE parcel_number END)) > 1) e
 UNION ALL
 SELECT 'canton and country set', count(*), count(*) = 0
   FROM iris_staging.cadastre_switzerland WHERE canton IS NULL OR country <> 'CH'

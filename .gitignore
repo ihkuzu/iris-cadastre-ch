@@ -7,3 +7,5 @@ __pycache__/
 !/logs/.gitkeep
 .pytest_cache/
 .ruff_cache/
+/build/
+*.egg-info/

@@ -215,3 +215,38 @@ def test_zip_with_paths_outside_the_folder_or_broken_zip_is_refused(tmp_path):
     broken.write_bytes(b"PK\x03\x04 not really a zip")
     with pytest.raises(zipfile.BadZipFile):
         av_file.unpack(broken)
+
+
+def test_every_feature_is_accounted_for_and_a_rejected_merge_keeps_all_parts(tmp_gpkg, settings, source):
+    fixtures.geodienste(tmp_gpkg, parts=True)
+    frame = gpd.read_file(tmp_gpkg, layer="resf")
+    frame.loc[frame["Nummer"] == "150", "EGRIS_EGRID"] = "CH999900000001"  # also on parcel 101
+    frame.to_file(tmp_gpkg, layer="resf", driver="GPKG")
+    out = transform(av_file.read(tmp_gpkg), source, settings)
+    assert out.read == len(out.rows) + len(out.rejected) + out.merged
+    merged = [r for r in out.rejected if "," in r["source_feature_id"]]
+    assert len(merged) == 1 and len(merged[0]["source_attributes"]["parts"]) == 2
+    assert merged[0]["geometry_wkt"].startswith("MULTIPOLYGON")
+
+
+def test_synthetic_rows_are_refused_under_a_real_canton(tmp_gpkg, settings, source):
+    fixtures.write(tmp_gpkg, fixtures.parcels(2))
+    real = dataclasses.replace(source, canton="AI", name="looks real")
+    with pytest.raises(ValueError, match="synthetic"):
+        run(tmp_gpkg, settings, real)
+
+
+def test_rows_from_another_canton_are_rejected(tmp_gpkg, settings, source):
+    rows = [{k: v for k, v in r.items() if k != "Note"} for r in fixtures.parcels(2)]
+    fixtures.write(tmp_gpkg, rows)
+    out = run(tmp_gpkg, settings, dataclasses.replace(source, canton="AI", name="looks real"))
+    assert dict(out.reasons) == {"canton_mismatch": 2}
+
+
+def test_a_new_export_with_the_same_content_has_the_same_hash(tmp_gpkg, settings, source):
+    fixtures.write(tmp_gpkg, fixtures.parcels(3))
+    first = av_file.read(tmp_gpkg, layer="Liegenschaften_Liegenschaft")
+    later = dataclasses.replace(first, dataset_date="2030-01-01")
+    a, b = transform(first, source, settings), transform(later, source, settings)
+    assert [r["record_hash"] for r in a.rows] == [r["record_hash"] for r in b.rows]
+    assert b.rows[0]["source_dataset_date"] == "2030-01-01"

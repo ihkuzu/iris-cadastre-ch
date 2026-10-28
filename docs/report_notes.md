@@ -29,8 +29,9 @@
 - 275,186 parcels from four cantons are in staging; every integrity check passes. AI, BS and GE
   load without a single rejection, repair or area difference, and a second run of the same file
   writes nothing (`inserted 0, updated 0, unchanged 9143` for AI).
-- Fribourg: of 168,520 features, 168,506 rows are stored, 4 features are held back (below) and
-  10 are parts merged into 4 multi-polygon parcels (warning `multipart_parcel`).
+- Fribourg: 168,520 features = 168,506 stored rows + 4 held back (below) + 10 merged. The 10
+  are extra polygons of 4 parcels that the source splits into separate features with one key;
+  each of the 4 is stored once as a MultiPolygon (`multipart_parcel`, `merged_parts` in the run).
 - Fribourg delivers one land register parcel as numbered parts `<article>.<nn>` that share the
   parcel's EGRID: 1,605 parts, 2 to 11 per EGRID, always within one NBIdent and article number.
   An earlier version of the rule rejected these as duplicate EGRIDs; FR is now configured with
@@ -57,7 +58,6 @@
 - An update replaces the stored row (geometry and attributes); earlier versions are not kept in a
   history table. Each run's file hash in `ingestion_runs` and the kept source files allow an
   earlier state to be rebuilt.
-
 - Coverage is the configured cantons, not all of Switzerland. Cantons that require approval
   (JU, LU, NE, NW, OW, VD) are deliberately not ingested.
 - INTERLIS (.itf/.xtf) is not read directly; the GeoPackage export of the same data is used.
