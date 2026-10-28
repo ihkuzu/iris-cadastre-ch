@@ -18,6 +18,7 @@ from shapely import make_valid, set_precision
 from shapely.geometry import MultiPolygon, Polygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform as shp_transform
+from shapely.ops import unary_union
 
 from app.config.sources import CANTONS, Source
 from app.extractors.av_file import Extract
@@ -45,8 +46,10 @@ class Result:
 
 def _clean(value):
     """A JSON-safe copy of one attribute value; datetimes become UTC ISO strings."""
-    if value is None:
+    if value is None or value is pd.NaT:
         return None
+    if isinstance(value, np.bool_):
+        return bool(value)
     if isinstance(value, float) and math.isnan(value):
         return None
     if isinstance(value, (np.integer,)):
@@ -107,19 +110,25 @@ def _epsg(frame: gpd.GeoDataFrame, source: Source) -> tuple[int, bool]:
     return int(source.native_crs.split(":")[1]), True
 
 
+HASHED = (
+    "canton",
+    "nbident",
+    "parcel_number",
+    "egrid",
+    "bfs_nr",
+    "municipality",
+    "parcel_type",
+    "completeness",
+    "validity",
+    "area_source_m2",
+    "source_dataset_date",
+    "source_attributes",
+)
+SAME_PARCEL = ("egrid", "bfs_nr", "parcel_type", "completeness", "validity")
+
+
 def record_hash(row: dict, wkb: bytes) -> str:
-    keys = (
-        "canton",
-        "nbident",
-        "parcel_number",
-        "egrid",
-        "bfs_nr",
-        "parcel_type",
-        "completeness",
-        "area_source_m2",
-        "source_dataset_date",
-    )
-    payload = json.dumps({k: row.get(k) for k in keys}, sort_keys=True, default=str).encode()
+    payload = json.dumps({k: row.get(k) for k in HASHED}, sort_keys=True, default=str).encode()
     return hashlib.sha256(payload + wkb).hexdigest()
 
 
@@ -167,39 +176,46 @@ def transform(extract: Extract, source: Source, settings) -> Result:
     for fid, feature in frame.iterrows():
         raw = {c: _clean(feature[c]) for c in attrs}
         geom = feature.geometry
-        reject = {
-            "canton": source.canton,
-            "source_feature_id": str(fid),
-            "source_attributes": raw,
-            "geometry_wkt": geom.wkt[:2000] if geom is not None and not geom.is_empty else None,
-        }
+        reject = {"canton": source.canton, "source_feature_id": str(fid), "source_attributes": raw, "geom": geom}
         nbident, number = _text(feature[m["nbident"]]), _text(feature[m["parcel_number"]])
         if not nbident or not number:
-            out.rejected.append({**reject, "reason": "missing_key", "detail": f"nbident={nbident!r} number={number!r}"})
+            out.rejected.append(
+                {**_wkt(dict(reject)), "reason": "missing_key", "detail": f"nbident={nbident!r} number={number!r}"}
+            )
             continue
         egrid = _text(feature[m["egrid"]]) if "egrid" in m else None
         egrid = egrid.upper().replace(" ", "") if egrid else None
         if egrid and not EGRID.match(egrid):
-            out.rejected.append({**reject, "reason": "malformed_egrid", "detail": egrid})
+            out.rejected.append({**_wkt(dict(reject)), "reason": "malformed_egrid", "detail": egrid})
             continue
         if "canton" in m:
             stated = _text(feature[m["canton"]])
             if stated and stated.upper() != source.canton:
-                out.rejected.append({**reject, "reason": "canton_mismatch", "detail": stated})
+                out.rejected.append({**_wkt(dict(reject)), "reason": "canton_mismatch", "detail": stated})
                 continue
         poly = _polygonal(geom)
         if poly is None:
             reason = "empty_geometry" if geom is None or geom.is_empty else "not_polygon"
-            out.rejected.append({**reject, "reason": reason, "detail": None if geom is None else geom.geom_type})
+            out.rejected.append(
+                {**_wkt(dict(reject)), "reason": reason, "detail": None if geom is None else geom.geom_type}
+            )
             continue
         repaired = False
         if not poly.is_valid:
             fixed = _polygonal(make_valid(poly))
             change = abs(fixed.area - poly.area) / poly.area if fixed is not None and poly.area else 1.0
             if fixed is None or not fixed.is_valid or change > settings.repair_tolerance:
-                out.rejected.append({**reject, "reason": "invalid_geometry", "detail": f"area change {change:.1%}"})
+                out.rejected.append(
+                    {**_wkt(dict(reject)), "reason": "invalid_geometry", "detail": f"area change {change:.1%}"}
+                )
                 continue
             poly, repaired = fixed, True
+        poly = _polygonal(set_precision(poly, 0.001))
+        if poly is None:
+            out.rejected.append(
+                {**_wkt(dict(reject)), "reason": "empty_geometry", "detail": "nothing left at 1 mm precision"}
+            )
+            continue
         if not source.synthetic and not nbident.upper().startswith(source.canton):
             out.warnings["nbident_without_canton_prefix"] += 1
         area_src = _number(feature[m["area_source_m2"]]) if "area_source_m2" in m else None
@@ -217,14 +233,15 @@ def transform(extract: Extract, source: Source, settings) -> Result:
             "nbident": nbident,
             "parcel_number": number,
             "egrid": egrid,
-            "parcel_type": _text(feature[m["parcel_type"]]) if "parcel_type" in m else None,
+            "parcel_type": _text(feature[m["parcel_type"]]) if "parcel_type" in m else source.parcel_type,
             "completeness": _text(feature[m["completeness"]]) if "completeness" in m else None,
+            "validity": _text(feature[m["validity"]]) if "validity" in m else None,
             "area_m2": round(poly.area, 2),
             "area_source_m2": round(area_src, 2) if area_src is not None else None,
             "geometry_repaired": repaired,
             "source_crs": out.source_crs,
             "source_feature_id": str(fid),
-            "source_dataset_date": source.dataset_date,
+            "source_dataset_date": extract.dataset_date or source.dataset_date,
             "source_attributes": raw,
         }
         if row["bfs_nr"] is None:
@@ -246,38 +263,69 @@ def transform(extract: Extract, source: Source, settings) -> Result:
     return out
 
 
+def _wkt(reject: dict) -> dict:
+    geom = reject.pop("geom", None)
+    reject["geometry_wkt"] = geom.wkt[:2000] if geom is not None and not geom.is_empty else None
+    return reject
+
+
+def _merge_parts(group: list) -> tuple[dict, MultiPolygon, dict] | None:
+    """Several Liegenschaft polygons of one parcel (NummerTeilGrundstueck) become one multipolygon."""
+    first = group[0][0]
+    if any(any(r[k] != first[k] for k in SAME_PARCEL) for r, _, _ in group):
+        return None
+    union = unary_union([p for _, p, _ in group])
+    total = sum(p.area for _, p, _ in group)
+    merged = _polygonal(union)
+    if merged is None or abs(merged.area - total) > 0.01 * total:
+        return None  # parts overlap, so these are not pieces of one parcel
+    row = dict(first)
+    sources = [r["area_source_m2"] for r, _, _ in group]
+    row.update(
+        area_m2=round(merged.area, 2),
+        area_source_m2=round(sum(sources), 2) if None not in sources else None,
+        geometry_repaired=any(r["geometry_repaired"] for r, _, _ in group),
+        source_feature_id=",".join(r["source_feature_id"] for r, _, _ in group),
+        source_attributes={"parts": [r["source_attributes"] for r, _, _ in group]},
+    )
+    return row, merged, group[0][2]
+
+
 def _dedupe(candidates, out: Result) -> None:
-    """Exact copies collapse into one row; conflicting rows with the same key are all rejected."""
+    """Exact copies collapse into one row, parts of one parcel are merged, real conflicts are held back."""
     by_key: dict[tuple, list] = defaultdict(list)
     for row, poly, reject in candidates:
-        poly = set_precision(poly, 0.001)
-        wkb = poly.normalize().wkb
-        row["record_hash"] = record_hash(row, wkb)
         by_key[(row["canton"], row["nbident"], row["parcel_number"])].append((row, poly, reject))
     kept = []
     for key in sorted(by_key):
-        group = by_key[key]
-        hashes = {g[0]["record_hash"] for g in group}
-        if len(hashes) > 1:
-            for _, _, reject in group:
-                out.rejected.append({**reject, "reason": "conflicting_duplicate", "detail": "/".join(key)})
-            continue
-        kept.append(group[0])
-        for _, _, reject in group[1:]:
-            out.rejected.append({**reject, "reason": "exact_duplicate", "detail": "/".join(key)})
-    seen: dict[str, tuple] = {}
-    clash = set()
+        unique, seen = [], set()
+        for row, poly, reject in by_key[key]:
+            fingerprint = (poly.normalize().wkb, tuple(row[k] for k in SAME_PARCEL), row["area_source_m2"])
+            if fingerprint in seen:
+                out.rejected.append({**_wkt(reject), "reason": "exact_duplicate", "detail": "/".join(key)})
+                continue
+            seen.add(fingerprint)
+            unique.append((row, poly, reject))
+        if len(unique) > 1:
+            merged = _merge_parts(unique)
+            if merged is None:
+                for _, _, reject in unique:
+                    out.rejected.append({**_wkt(reject), "reason": "conflicting_duplicate", "detail": "/".join(key)})
+                continue
+            out.warnings["multipart_parcel"] += 1
+            unique = [merged]
+        kept.append(unique[0])
+    owners: dict[str, int] = defaultdict(int)
     for row, _, _ in kept:
         if row["egrid"]:
-            if row["egrid"] in seen:
-                clash.add(row["egrid"])
-            seen[row["egrid"]] = row
+            owners[row["egrid"]] += 1
     final = []
     for row, poly, reject in kept:
-        if row["egrid"] in clash:
-            out.rejected.append({**reject, "reason": "duplicate_egrid", "detail": row["egrid"]})
+        if row["egrid"] and owners[row["egrid"]] > 1:
+            out.rejected.append({**_wkt(reject), "reason": "duplicate_egrid", "detail": row["egrid"]})
             continue
         row["geom"] = poly
+        row["record_hash"] = record_hash(row, poly.normalize().wkb)
         final.append(row)
     if final:
         wgs = gpd.GeoSeries([r["geom"] for r in final], crs=LV95).to_crs(WGS84)

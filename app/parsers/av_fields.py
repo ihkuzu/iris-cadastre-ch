@@ -13,6 +13,7 @@ CANDIDATES: dict[str, tuple[str, ...]] = {
     "area_source_m2": ("flaechenmass", "flaeche", "gesamteflaechenmass", "area", "surface"),
     "completeness": ("vollstaendigkeit", "completeness"),
     "parcel_type": ("art", "grundstueckart", "type"),
+    "validity": ("gueltigkeit", "validite", "validity"),
     "bfs_nr": ("bfsnr", "bfs_nr", "bfs_nummer", "gemeinde_bfs", "bfs"),
     "municipality": ("gemeindename", "gemeinde_name", "name_gemeinde"),
     "canton": ("kanton", "canton", "kt"),

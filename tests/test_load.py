@@ -128,3 +128,13 @@ def test_report_and_validation(eng, db_url, tmp_gpkg, tmp_path, settings, source
     assert main(["validate"]) == 0
     assert "FAIL" not in capsys.readouterr().out
     get_settings.cache_clear()
+
+
+def test_parcel_missing_from_a_new_file_is_counted_not_deleted(eng, tmp_gpkg, tmp_path, settings, source):
+    fixtures.write(tmp_gpkg, fixtures.parcels(5))
+    ingest(eng, tmp_gpkg, settings, source, layer="Liegenschaften_Liegenschaft")
+    smaller = fixtures.write(tmp_path / "smaller.gpkg", fixtures.parcels(4))
+    stats = ingest(eng, smaller, settings, source, layer="Liegenschaften_Liegenschaft")
+    assert (stats.unchanged, stats.not_in_source) == (4, 1)
+    assert count(eng, "SELECT count(*) FROM S.cadastre_switzerland") == 5
+    assert count(eng, "SELECT not_in_source FROM S.ingestion_runs ORDER BY started_at DESC LIMIT 1") == 1

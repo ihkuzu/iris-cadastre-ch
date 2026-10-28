@@ -27,7 +27,14 @@ docker compose run --rm app report                  # docs/quality_report.md, re
 docker compose run --rm app validate                # exit code 1 if a check fails
 ```
 
-Running `ingest` again on the same file changes nothing (`inserted 0, updated 0, unchanged N`).
+Running `ingest` again on the same file writes no parcel rows (`inserted 0, updated 0,
+unchanged N`); only a new entry in `ingestion_runs` is added. `download` keeps a file that is
+already there (geodienste.ch allows one download per dataset and day); `--force` fetches it again.
+
+Updating an existing database after a schema change: `docker compose down -v` removes only this
+project's PostGIS volume (`iris_cadastre_ch_pg`), then `up -d db` and `init-db` again.
+If the bind-mounted `data/`, `logs/` or `results/` folders are not writable for the container
+user (uid 1000) on Linux, create them first and give that user write access.
 
 ## Local run and tests
 
@@ -47,11 +54,12 @@ The database tests create and drop their own schema `iris_staging_test`.
 
 - Source: geodienste.ch, offer "Amtliche Vermessung" version 24.0, model DM.01-AV-CH, LV95
   (EPSG:2056), GeoPackage per canton. Details and links: [docs/sources.md](docs/sources.md).
-- Cantons: AI (Appenzell Innerrhoden), BS (Basel-Stadt) and GE (Genève), FR configured as well.
-  All are freely available with attribution; cantons that need approval (JU, LU, NE, NW, OW, VD)
-  are configured as closed and the loader refuses them.
+- Cantons: AI (Appenzell Innerrhoden), BS (Basel-Stadt), GE (Genève) and FR (Fribourg/Freiburg),
+  all freely available with attribution. The cantons that need approval (JU, LU, NE, NW, OW, VD)
+  are in the config as closed: `download` and the loader refuse them.
 - Every row stores the source name, download URL, licence and terms URL, file name, SHA-256 of
-  the file, layer, feature id, source CRS, the dataset date and all original attributes.
+  the file, layer, feature id, source CRS, the dataset date (`last_change` of the layer in the
+  GeoPackage, the config value only as a fallback) and all original attributes.
 - Every run is recorded in `ingestion_runs` with counts, rejection reasons and the field mapping.
 - Attribution: data © the respective canton, via geodienste.ch.
 
@@ -61,23 +69,28 @@ The database tests create and drop their own schema `iris_staging_test`.
 |---|---|---|
 | `country` | constant | `CH` |
 | `canton`, `canton_name` | configuration | two-letter code, checked against a canton attribute if present |
-| `bfs_nr`, `municipality` | municipality boundary layer (`Gemeindegrenze`) | point inside the parcel |
-| `nbident` | `Grundstueck.NBIdent` | numbering area, starts with the canton code |
-| `parcel_number` | `Grundstueck.Nummer` | |
-| `egrid` | `Grundstueck.EGRIS_EGRID` | national id `CH` + 12 characters, unique, optional |
-| `parcel_type`, `completeness` | `Art`, `Vollstaendigkeit` | as delivered |
-| `area_source_m2` | `Liegenschaft.Flaechenmass` | the legal area |
+| `bfs_nr` | `resf.BFSNr` | else from the municipality layer `mbsf` by a point inside the parcel |
+| `municipality` | `mbsf.Name` | point inside the parcel |
+| `nbident` | `resf.NBIdent` (DM.01 `Grundstueck.NBIdent`) | numbering area, starts with the canton code |
+| `parcel_number` | `resf.Nummer` | |
+| `egrid` | `resf.EGRIS_EGRID` | national id `CH` + 12 characters, unique, optional |
+| `parcel_type` | configuration | `Liegenschaft`; the layer has no `Art` column |
+| `completeness`, `validity` | `Vollstaendigkeit`, `Gueltigkeit` | as delivered |
+| `area_source_m2` | `resf.Flaeche` | the legal area |
 | `area_m2` | computed in LV95 | m², compared with `area_source_m2` |
-| `geom` | `Liegenschaft.Geometrie` | MultiPolygon, EPSG:2056, arcs stroked |
+| `geom` | `resf` geometry | MultiPolygon, EPSG:2056, arcs stroked, 1 mm precision |
 | `geom_wgs84` | derived | MultiPolygon, EPSG:4326 |
 | `geometry_repaired` | check | true when an invalid polygon was repaired |
 | `source_*`, `licence*` | configuration and file | provenance, see above |
 | `source_attributes` | all original columns | JSON, nothing is dropped |
-| `record_hash`, `run_id`, `first_seen_at`, `updated_at` | ingestion | audit |
+| `record_hash`, `run_id`, `first_seen_at`, `updated_at` | ingestion | `run_id` is the run that last wrote the row |
+| `last_seen_run_id` | ingestion | last run whose file still contained the parcel |
 
-Key: `canton + nbident + parcel_number` (unique), as in DM.01-AV-CH. Column names are matched in
-any spelling (`EGRIS_EGRID`, `egris_egrid`, `egrid` ...); if numbers and geometry come in two
-layers (`Grundstueck` and `Liegenschaft`), they are joined.
+Key: `canton + nbident + parcel_number` (unique), as in DM.01-AV-CH. The geodienste.ch
+GeoPackage is flat: the layer `resf` holds geometry and Grundstueck attributes together; `resfproj`
+(projected) and `dprsf` (building rights) are skipped. Column names are matched in any spelling
+(`EGRIS_EGRID`, `egris_egrid`, `egrid` ...), and for INTERLIS-shaped exports with separate
+`Grundstueck` and `Liegenschaft` layers the two are joined.
 
 ## Checks and fault handling
 
@@ -88,12 +101,16 @@ layers (`Grundstueck` and `Liegenschaft`), they are joined.
 | no geometry, or not an area | rejected: `empty_geometry`, `not_polygon` |
 | invalid polygon | repaired if the area changes by at most 1 %, else rejected: `invalid_geometry` |
 | identical copy | stored once, the copy recorded as `exact_duplicate` |
-| same key, different content | all copies held back: `conflicting_duplicate` |
+| same key, several separate polygons, same attributes | merged into one MultiPolygon, areas summed (`multipart_parcel` warning) |
+| same key, different content or overlapping parts | all copies held back: `conflicting_duplicate` |
 | same EGRID on two keys | `duplicate_egrid`, or `egrid_already_stored` across runs |
 | canton attribute differs | rejected: `canton_mismatch` |
 | CRS missing | taken from the configuration, logged |
 | LV03 data | reprojected to LV95, logged |
 | any other CRS | the file is refused |
+| polygon empty after rounding to 1 mm | rejected: `empty_geometry` |
+| parcel stored before but missing in the new file | kept, counted in `ingestion_runs.not_in_source` and logged |
+| server returns an order page instead of a zip | `download` stops, nothing is kept |
 | database error during load | transaction rolled back, run marked `failed` with the error |
 | schema not `iris_staging*`, closed licence, synthetic data in the main schema | refused before writing |
 

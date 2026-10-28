@@ -30,8 +30,8 @@ under cantonal copyright; geodienste.ch asks for at most one download per datase
 | Approval required, fees possible | JU (above 10 ha), LU, NE, NW, OW, VD |
 | Not checked row by row | SH, SO, SZ, TG, TI, UR, VS, ZG, ZH |
 
-This submission uses AI, BS and GE (FR is configured too): all freely available with attribution,
-two languages and three kinds of territory (rural, city, large urban canton).
+This submission uses AI, BS, GE and FR: all freely available with attribution, German and French,
+rural, city, urban and a large bilingual canton.
 
 ## The data model (DM.01-AV-CH, topic Liegenschaften)
 

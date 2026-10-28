@@ -26,6 +26,7 @@ UPDATABLE = (
     "egrid",
     "parcel_type",
     "completeness",
+    "validity",
     "area_m2",
     "area_source_m2",
     "geom",
@@ -44,6 +45,7 @@ UPDATABLE = (
     "source_attributes",
     "record_hash",
     "run_id",
+    "last_seen_run_id",
 )
 
 
@@ -54,11 +56,14 @@ class LoadStats:
     updated: int = 0
     unchanged: int = 0
     rejected: int = 0
+    not_in_source: int = 0
 
 
-def _rows(result: Result, extract: Extract, source: Source, run_id) -> list[dict]:
+def _rows(result: Result, extract: Extract, source: Source, run_id, skip: set) -> list[dict]:
     rows = []
     for r in result.rows:
+        if (r["nbident"], r["parcel_number"]) in skip:
+            continue
         row = dict(r)
         if isinstance(row["source_dataset_date"], str):
             row["source_dataset_date"] = date.fromisoformat(row["source_dataset_date"])
@@ -73,6 +78,7 @@ def _rows(result: Result, extract: Extract, source: Source, run_id) -> list[dict
             source_sha256=extract.sha256,
             source_layer=extract.layer,
             run_id=run_id,
+            last_seen_run_id=run_id,
         )
         rows.append(row)
     return rows
@@ -103,23 +109,42 @@ def load(engine: Engine, schema: str, table: str, result: Result, extract: Extra
             )
         )
     try:
-        rows = _rows(result, extract, source, stats.run_id)
         with engine.begin() as conn:
+            query = select(parcels.c.nbident, parcels.c.parcel_number, parcels.c.record_hash).where(
+                parcels.c.canton == source.canton
+            )
+            stored = {(n, p): h for n, p, h in conn.execute(query)}
+            # rows whose hash is already stored are not sent again, only marked as seen
+            same = {
+                (r["nbident"], r["parcel_number"])
+                for r in result.rows
+                if stored.get((r["nbident"], r["parcel_number"])) == r["record_hash"]
+            }
+            rows = _rows(result, extract, source, stats.run_id, same)
             rows = _drop_egrid_clashes(conn, parcels, rows, result)
             for i in range(0, len(rows), BATCH):
                 chunk = rows[i : i + BATCH]
-                stmt = insert(parcels).values(chunk)
+                stmt = insert(parcels)
                 excluded = stmt.excluded
                 stmt = stmt.on_conflict_do_update(
                     constraint=f"{table}_natural_key",
                     set_={**{c: excluded[c] for c in UPDATABLE}, "updated_at": func.now()},
-                    # only rows whose content changed are touched, so a rerun leaves everything as it was
                     where=parcels.c.record_hash != excluded.record_hash,
                 ).returning(text("(xmax = 0) AS inserted"))
-                flags = [r.inserted for r in conn.execute(stmt)]
+                flags = [r.inserted for r in conn.execute(stmt, chunk)]
                 stats.inserted += sum(flags)
                 stats.updated += len(flags) - sum(flags)
-            stats.unchanged = len(rows) - stats.inserted - stats.updated
+            stats.unchanged = len(same)
+            _mark_seen(conn, schema, table, source.canton, stats.run_id, same)
+            stats.not_in_source = conn.execute(
+                select(func.count()).where(
+                    parcels.c.canton == source.canton, parcels.c.last_seen_run_id != stats.run_id
+                )
+            ).scalar_one()
+            if stats.not_in_source:
+                log.warning(
+                    "{} stored parcels are no longer in this source file; kept, not deleted", stats.not_in_source
+                )
             if result.rejected:
                 conn.execute(rejected.insert(), [{**r, "run_id": stats.run_id} for r in result.rejected])
             stats.rejected = len(result.rejected)
@@ -130,7 +155,8 @@ def load(engine: Engine, schema: str, table: str, result: Result, extract: Extra
                     finished_at=datetime.now(UTC),
                     status="succeeded",
                     read=result.read,
-                    accepted=len(rows),
+                    accepted=stats.inserted + stats.updated + stats.unchanged,
+                    not_in_source=stats.not_in_source,
                     inserted=stats.inserted,
                     updated=stats.updated,
                     unchanged=stats.unchanged,
@@ -142,7 +168,7 @@ def load(engine: Engine, schema: str, table: str, result: Result, extract: Extra
                         "mapping": result.mapping,
                         "source_crs": result.source_crs,
                         "licence": source.licence,
-                        "dataset_date": source.dataset_date,
+                        "dataset_date": extract.dataset_date or source.dataset_date,
                     },
                 )
             )
@@ -194,3 +220,17 @@ def _drop_egrid_clashes(conn, parcels, rows: list[dict], result: Result) -> list
             continue
         keep.append(r)
     return keep
+
+
+def _mark_seen(conn, schema: str, table: str, canton: str, run_id, keys: set) -> None:
+    if not keys:
+        return
+    conn.execute(text("CREATE TEMP TABLE seen_keys (nbident text, parcel_number text) ON COMMIT DROP"))
+    conn.execute(text("INSERT INTO seen_keys VALUES (:n, :p)"), [{"n": n, "p": p} for n, p in keys])
+    conn.execute(
+        text(
+            f'UPDATE "{schema}".{table} t SET last_seen_run_id = :run FROM seen_keys s '
+            "WHERE t.canton = :canton AND t.nbident = s.nbident AND t.parcel_number = s.parcel_number"
+        ),
+        {"run": run_id, "canton": canton},
+    )

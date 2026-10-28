@@ -12,6 +12,9 @@ licence = "Frei erhältlich, Quellenangabe Pflicht (geodienste.ch terms of use a
 licence_url = "https://www.geodienste.ch/terms-of-use"
 access = "open-with-attribution"
 native_crs = "EPSG:2056"
+layer = "resf"
+municipality_layer = "mbsf"
+parcel_type = "Liegenschaft"
 
 [source.BS]
 name = "Kanton Basel-Stadt, amtliche Vermessung via geodienste.ch"
@@ -21,6 +24,9 @@ licence = "Frei erhältlich, Quellenangabe Pflicht (geodienste.ch terms of use a
 licence_url = "https://www.geodienste.ch/terms-of-use"
 access = "open-with-attribution"
 native_crs = "EPSG:2056"
+layer = "resf"
+municipality_layer = "mbsf"
+parcel_type = "Liegenschaft"
 
 [source.GE]
 name = "République et canton de Genève, mensuration officielle via geodienste.ch"
@@ -30,6 +36,9 @@ licence = "Freie Nutzung, Quellenangabe Pflicht; SITG conditions d'utilisation"
 licence_url = "https://sitg.ge.ch/ressources/conditions-utilisation-donnees"
 access = "open-with-attribution"
 native_crs = "EPSG:2056"
+layer = "resf"
+municipality_layer = "mbsf"
+parcel_type = "Liegenschaft"
 
 [source.FR]
 name = "Canton de Fribourg / Kanton Freiburg, amtliche Vermessung via geodienste.ch"
@@ -39,11 +48,49 @@ licence = "Freie Nutzung, Quellenangabe Pflicht (geodienste.ch terms of use and 
 licence_url = "https://www.geodienste.ch/terms-of-use"
 access = "open-with-attribution"
 native_crs = "EPSG:2056"
+layer = "resf"
+municipality_layer = "mbsf"
+parcel_type = "Liegenschaft"
 
-# Needs approval or fees on geodienste.ch, so it is listed but not ingested.
+# These need approval on geodienste.ch, so they are listed but never downloaded or ingested.
 [source.VD]
 name = "Canton de Vaud, mensuration officielle via geodienste.ch"
 url = "https://www.geodienste.ch/downloads/av?cantons=VD"
+licence = "Freigabe erforderlich (approval required)"
+licence_url = "https://www.geodienste.ch/downloads/av"
+access = "approval-required"
+
+[source.JU]
+name = "République et canton du Jura, mensuration officielle via geodienste.ch"
+url = "https://www.geodienste.ch/downloads/av?cantons=JU"
+licence = "Freigabe erforderlich (approval required)"
+licence_url = "https://www.geodienste.ch/downloads/av"
+access = "approval-required"
+
+[source.LU]
+name = "Kanton Luzern, amtliche Vermessung via geodienste.ch"
+url = "https://www.geodienste.ch/downloads/av?cantons=LU"
+licence = "Freigabe erforderlich (approval required)"
+licence_url = "https://www.geodienste.ch/downloads/av"
+access = "approval-required"
+
+[source.NE]
+name = "République et canton de Neuchâtel, mensuration officielle via geodienste.ch"
+url = "https://www.geodienste.ch/downloads/av?cantons=NE"
+licence = "Freigabe erforderlich (approval required)"
+licence_url = "https://www.geodienste.ch/downloads/av"
+access = "approval-required"
+
+[source.NW]
+name = "Kanton Nidwalden, amtliche Vermessung via geodienste.ch"
+url = "https://www.geodienste.ch/downloads/av?cantons=NW"
+licence = "Freigabe erforderlich (approval required)"
+licence_url = "https://www.geodienste.ch/downloads/av"
+access = "approval-required"
+
+[source.OW]
+name = "Kanton Obwalden, amtliche Vermessung via geodienste.ch"
+url = "https://www.geodienste.ch/downloads/av?cantons=OW"
 licence = "Freigabe erforderlich (approval required)"
 licence_url = "https://www.geodienste.ch/downloads/av"
 access = "approval-required"

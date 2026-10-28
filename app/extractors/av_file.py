@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
+import sqlite3
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +26,8 @@ POLYGONS = {
     "CurvePolygon Z",
     "MultiSurface Z",
 }
+# a layer with mixed or broken geometries is listed as Unknown, it may still hold the parcels
+MAYBE_POLYGONS = POLYGONS | {"Unknown", "Geometry", "GeometryCollection"}
 FK_HINTS = ("liegenschaft_von", "grundstueck", "_von", "fk")
 PK_HINTS = ("t_id", "tid", "t_ili_tid", "fid", "id")
 
@@ -38,9 +42,21 @@ class Extract:
     municipalities: gpd.GeoDataFrame | None = None
     municipality_layer: str | None = None
     joined_from: str | None = None
+    dataset_date: str | None = None
+
+
+_HASHES: dict[tuple[str, int, int], str] = {}
 
 
 def sha256(path: Path) -> str:
+    stat = path.stat()
+    key = (str(path.resolve()), stat.st_size, stat.st_mtime_ns)
+    if key not in _HASHES:
+        _HASHES[key] = _digest(path)
+    return _HASHES[key]
+
+
+def _digest(path: Path) -> str:
     digest = hashlib.sha256()
     with open(path, "rb") as fh:
         for block in iter(lambda: fh.read(1 << 20), b""):
@@ -57,19 +73,36 @@ def gdal_path(path: Path) -> str:
 
 def unpack(path: Path) -> Path:
     """Unpack a downloaded zip once, next to it, and return the data file inside."""
-    target = path.with_suffix("")
+    target = path.parent / f"{path.stem}_{sha256(path)[:12]}"
     if not target.exists():
+        partial = target.with_name(target.name + ".part")
+        shutil.rmtree(partial, ignore_errors=True)
         with zipfile.ZipFile(path) as zf:
             for member in zf.namelist():
-                dest = (target / member).resolve()
-                if not dest.is_relative_to(target.resolve()):
+                dest = (partial / member).resolve()
+                if not dest.is_relative_to(partial.resolve()):
                     raise ValueError(f"unsafe path in {path.name}: {member}")
-            zf.extractall(target)
+            zf.extractall(partial)
+        partial.rename(target)
     found = sorted(p for p in target.rglob("*") if p.suffix.lower() in DATA_SUFFIXES)
     if not found:
         raise ValueError(f"no GeoPackage, Shapefile or GeoJSON inside {path.name}")
     gpkg = [p for p in found if p.suffix.lower() == ".gpkg"]
     return (gpkg or found)[0]
+
+
+def gpkg_date(path: Path, layer: str) -> str | None:
+    """last_change of the layer as stated in gpkg_contents, the closest thing to a dataset date."""
+    if path.suffix.lower() == ".zip":
+        path = unpack(path)
+    if path.suffix.lower() != ".gpkg":
+        return None
+    try:
+        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as con:
+            hit = con.execute("SELECT last_change FROM gpkg_contents WHERE table_name = ?", (layer,)).fetchone()
+    except sqlite3.Error:
+        return None
+    return str(hit[0])[:10] if hit and hit[0] else None
 
 
 def layers(path: Path) -> list[tuple[str, str]]:
@@ -103,13 +136,16 @@ def pick_parcel_layer(path: Path, wanted: str | None = None) -> str:
         return wanted
     candidates = []
     for name, geom in found:
-        if geom not in POLYGONS:
+        if geom not in MAYBE_POLYGONS:
             continue
         cols = list(pyogrio.read_info(gdal_path(path), layer=name)["fields"])
         hit = find_columns(cols)
         if "parcel_number" in hit and "nbident" in hit:
-            # Liegenschaft layers win over other parcel-like polygon layers
-            candidates.append((0 if "liegenschaft" in name.lower() else 1, name))
+            lower = name.lower()
+            if "proj" in lower or lower.startswith("dprsf") or "selbstrecht" in lower:
+                continue  # projected parcels and building rights are not real estate parcels
+            # resf is the geodienste.ch name of the Liegenschaften layer
+            candidates.append((0 if lower == "resf" or lower.endswith("liegenschaft") else 1, name))
     if not candidates:
         # geometry and numbers may sit in two layers (Liegenschaft and Grundstueck)
         geometry_only = [n for n, g in found if g in POLYGONS and n.lower().endswith("liegenschaft")]
@@ -124,7 +160,7 @@ def pick_municipality_layer(path: Path, wanted: str | None = None) -> str | None
         return wanted
     for name, geom in layers(path):
         lower = name.lower()
-        if geom in POLYGONS and ("gemeindegrenze" in lower or "gemeinde" in lower) and "teil" not in lower:
+        if geom in POLYGONS and (lower == "mbsf" or "gemeindegrenze" in lower) and "teil" not in lower:
             return name
     return None
 
@@ -189,7 +225,15 @@ def read(
     if attribute_layer or not ("nbident" in hit and "parcel_number" in hit):
         frame, joined = join_attributes(path, frame, attribute_layer, join_left, join_right)
     crs = frame.crs.to_string() if frame.crs else None
-    out = Extract(frame=frame, path=path, layer=chosen, sha256=sha256(path), crs=crs, joined_from=joined)
+    out = Extract(
+        frame=frame,
+        path=path,
+        layer=chosen,
+        sha256=sha256(path),
+        crs=crs,
+        joined_from=joined,
+        dataset_date=gpkg_date(path, chosen),
+    )
     mun = pick_municipality_layer(path, municipality_layer)
     if mun:
         out.municipalities = gpd.read_file(gdal_path(path), layer=mun, engine="pyogrio")

@@ -50,6 +50,7 @@ class Source:
     file: str | None = None
     layer: str | None = None
     municipality_layer: str | None = None
+    parcel_type: str | None = None
     attribute_layer: str | None = None
     join_left: str | None = None
     join_right: str | None = None

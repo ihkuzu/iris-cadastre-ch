@@ -86,3 +86,37 @@ def broken() -> list[dict]:
         {**good[2], "geometry": square(30)},
         {**base, "Nummer": "206", "EGRIS_EGRID": "CH999900000000", "geometry": square(40)},
     ]
+
+
+def geodienste(path: Path, parts: bool = False) -> Path:
+    """The flat layout of the geodienste.ch GeoPackage: resf, resfproj, dprsf and mbsf, all SYNTHETIC."""
+
+    def layer(name, rows):
+        gpd.GeoDataFrame(rows, geometry="geometry", crs=2056).to_file(path, layer=name, driver="GPKG", engine="pyogrio")
+
+    def row(i, number, geom, **extra):
+        return {
+            "BFSNr": 9902,
+            "NBIdent": "XX0200000001",
+            "Nummer": number,
+            "EGRIS_EGRID": f"CH9999{i:08d}",
+            "Vollstaendigkeit": "vollstaendig",
+            "Flaeche": round(geom.area),
+            "Gueltigkeit": "gueltig",
+            "Kanton": "XX",
+            "geometry": geom,
+            **extra,
+        }
+
+    resf = [row(i, str(100 + i), square(i)) for i in range(4)]
+    if parts:
+        # one parcel drawn as two separate polygons, the way AV stores a parcel cut by a road
+        resf += [row(50, "150", square(5)), row(50, "150", square(7))]
+    layer("resf", resf)
+    layer("resfproj", [row(90, "900", square(8))])
+    layer("dprsf", [row(91, "S1", square(9), Art="SelbstRecht.Baurecht")])
+    layer(
+        "mbsf",
+        [{"BFSNr": 9902, "Name": "Synthetica", "Kanton": "XX", "geometry": box(X0 - 10, Y0 - 10, X0 + 400, Y0 + 30)}],
+    )
+    return path

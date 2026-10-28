@@ -1,0 +1,11 @@
+# SYNTHETIC source for the container test in CI; never real cadastre data.
+[source.XX]
+name = "SYNTHETIC test fixture"
+url = "file://tests/data/synthetic_geodienste.gpkg"
+file = "synthetic_geodienste.gpkg"
+licence = "none, synthetic"
+licence_url = "file://tests/fixtures.py"
+access = "open"
+layer = "resf"
+municipality_layer = "mbsf"
+parcel_type = "Liegenschaft"

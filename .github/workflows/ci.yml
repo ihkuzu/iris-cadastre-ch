@@ -44,6 +44,15 @@ jobs:
       - run: docker compose build
       - run: docker compose up -d db
       - run: docker compose run --rm app init-db
-      - run: docker compose run --rm app inspect tests/data/synthetic_arc.gpkg
+      - run: docker compose run --rm app inspect tests/data/synthetic_geodienste.gpkg
+      - name: ingest synthetic data twice into a test schema, then report and validate
+        env:
+          RUN: docker compose run --rm -e IRIS_DB_SCHEMA=iris_staging_ci -e IRIS_SOURCES_FILE=tests/data/ci_sources.toml app
+        run: |
+          $RUN ingest XX --file tests/data/synthetic_geodienste.gpkg
+          $RUN ingest XX --file tests/data/synthetic_geodienste.gpkg | tee second.txt
+          grep -q "inserted 0, updated 0, unchanged 5" second.txt
+          $RUN report --out results/ci_report.md --results results/ci
+          $RUN validate
       - run: docker compose run --rm app validate
       - run: docker compose down -v

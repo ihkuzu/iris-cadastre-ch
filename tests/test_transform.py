@@ -1,3 +1,4 @@
+import dataclasses
 from pathlib import Path
 
 import geopandas as gpd
@@ -148,5 +149,37 @@ def test_downloaded_zip_is_unpacked_once_and_hashed_as_downloaded(tmp_path, sett
         zf.write(gpkg, "av_XX/av_XX.gpkg")
     extract = av_file.read(archive)
     assert extract.sha256 == av_file.sha256(archive) and len(extract.frame) == 3
-    assert (tmp_path / "av_XX_gpkg_lv95" / "av_XX" / "av_XX.gpkg").exists()
+    folder = tmp_path / f"av_XX_gpkg_lv95_{extract.sha256[:12]}"
+    assert (folder / "av_XX" / "av_XX.gpkg").exists()
     assert len(transform(extract, source, settings).rows) == 3
+
+
+def test_geodienste_layout_picks_resf_and_keeps_validity(tmp_gpkg, settings, source):
+    fixtures.geodienste(tmp_gpkg)
+    extract = av_file.read(tmp_gpkg)
+    assert extract.layer == "resf" and extract.municipality_layer == "mbsf"
+    assert extract.dataset_date and len(extract.dataset_date) == 10
+    out = transform(extract, dataclasses.replace(source, parcel_type="Liegenschaft"), settings)
+    assert len(out.rows) == 4 and not out.rejected
+    row = out.rows[0]
+    assert row["validity"] == "gueltig" and row["parcel_type"] == "Liegenschaft"
+    assert row["bfs_nr"] == 9902 and row["source_dataset_date"] == extract.dataset_date
+
+
+def test_parts_of_one_parcel_become_one_multipolygon(tmp_gpkg, settings, source):
+    fixtures.geodienste(tmp_gpkg, parts=True)
+    out = transform(av_file.read(tmp_gpkg), source, settings)
+    merged = [r for r in out.rows if r["parcel_number"] == "150"]
+    assert len(merged) == 1 and not out.rejected
+    assert len(merged[0]["geom"].geoms) == 2 and merged[0]["area_m2"] == 800
+    assert merged[0]["area_source_m2"] == 800 and out.warnings["multipart_parcel"] == 1
+
+
+def test_numpy_and_missing_values_are_stored_as_plain_json():
+    import numpy as np
+
+    from app.transformers.parcels import _clean
+
+    assert _clean(np.bool_(True)) is True
+    assert _clean(pd.NaT) is None
+    assert _clean(np.int64(3)) == 3

@@ -12,8 +12,14 @@
   without height); the LV95 column is the reference.
 - Areas are computed in LV95 in square metres. A difference to the stored `Flaechenmass` above
   1 m² and 0.5 % is reported, not corrected: the stored value is the legal one.
-- Municipality (BFS number and name) comes from the municipality boundary layer of the same
-  export, by a point inside each parcel.
+- Municipality: the BFS number is on every `resf` row; the name comes from the municipality
+  boundary layer `mbsf` of the same export, by a point inside each parcel.
+- A parcel stored as several separate polygons with the same key and attributes is one parcel
+  and is stored as one MultiPolygon with the summed area.
+- `source_dataset_date` is the layer's `last_change` in the GeoPackage, which is the export date
+  of geodienste.ch, not the date of the last field survey.
+- An unchanged parcel keeps the provenance (file, hash, run) of the run that last wrote it; a new
+  run only updates `last_seen_run_id`. Parcels missing from a newer file are counted, not deleted.
 
 ## Known gaps
 
@@ -24,3 +30,7 @@
   an update then.
 - An invalid polygon is repaired only if the area changes by at most 1 %; otherwise it is held
   back in `rejected_records` with its WKT, for a person to look at.
+- LV03 input is reprojected with the standard pyproj transformation, which is accurate to about a
+  metre, not with the official FINELTRA grid; for legal accuracy use LV95 sources (all
+  geodienste.ch exports are LV95).
+- `geom_wgs84` is for display; its accuracy is limited by the datum shift and is not cadastral.

@@ -17,6 +17,13 @@ licence_url = "file://tests/fixtures.py"
 access = "open"
 dataset_date = "2026-10-01"
 
+[source.AI]
+name = "download test, nothing is fetched"
+url = "https://example.invalid/av_AI_gpkg_lv95.zip"
+licence = "test"
+licence_url = "https://example.invalid"
+access = "open-with-attribution"
+
 [source.VD]
 name = "closed"
 url = "https://example.invalid"
@@ -44,7 +51,8 @@ def env(tmp_path, monkeypatch):
 def test_shipped_config_is_valid_and_only_open_sources_are_lawful():
     sources = load_sources(Path(__file__).parents[1] / "config" / "sources.toml")
     assert {"AI", "BS", "GE", "FR"} <= set(sources)
-    assert all(s.lawful for c, s in sources.items() if c != "VD") and not sources["VD"].lawful
+    closed = {"JU", "LU", "NE", "NW", "OW", "VD"}
+    assert {c for c, s in sources.items() if not s.lawful} == closed
     assert all(s.licence and s.licence_url.startswith("https://") for s in sources.values())
 
 
@@ -74,3 +82,19 @@ def test_ingest_report_validate_end_to_end(env, db_url, monkeypatch, capsys):
     assert main(["report", "--out", str(report), "--results", str(results)]) == 0
     assert "All checks pass" in report.read_text() and (results / "summary.json").exists()
     assert main(["validate"]) == 0
+
+
+def test_download_keeps_an_existing_file_and_refuses_an_order_page(env, monkeypatch, capsys):
+    import io
+    import urllib.request
+
+    from app.config.settings import get_settings
+
+    target = get_settings().data_dir / "raw" / "AI" / "av_AI_gpkg_lv95.zip"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: io.BytesIO(b"<html>order page</html>"))
+    assert main(["download", "AI"]) == 2 and not target.exists()
+    assert not list(target.parent.glob("*.part"))
+    target.write_bytes(b"kept")
+    assert main(["download", "AI"]) == 0 and target.read_bytes() == b"kept"
+    assert "--force" in capsys.readouterr().out

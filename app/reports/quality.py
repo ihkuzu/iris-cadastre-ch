@@ -41,7 +41,7 @@ def gather(engine: Engine, schema: str, table: str) -> dict:
                 min(source_dataset_date) AS dataset_date, max(licence) AS licence, max(source_crs) AS source_crs
                 FROM "{s}".{t} GROUP BY canton, canton_name ORDER BY canton"""),
             "runs": q("""SELECT run_id::text, canton, source_file, left(source_sha256, 12) AS sha256, status,
-                read, accepted, inserted, updated, unchanged, rejected, repaired,
+                read, accepted, inserted, updated, unchanged, rejected, repaired, not_in_source,
                 to_char(started_at, 'YYYY-MM-DD HH24:MI') AS started, details
                 FROM "{s}".ingestion_runs ORDER BY started_at DESC LIMIT 20"""),
             "rejected": q("""SELECT canton, reason, count(*) AS n FROM "{s}".rejected_records

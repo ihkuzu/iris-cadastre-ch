@@ -40,6 +40,7 @@ def build(schema: str, table: str = "cadastre_switzerland") -> tuple[MetaData, d
         Column("egrid", String(14)),
         Column("parcel_type", Text),
         Column("completeness", Text),
+        Column("validity", Text),
         Column("area_m2", Numeric(14, 2), nullable=False),
         Column("area_source_m2", Numeric(14, 2)),
         Column("geom", Geometry("MULTIPOLYGON", srid=2056, spatial_index=False), nullable=False),
@@ -58,6 +59,8 @@ def build(schema: str, table: str = "cadastre_switzerland") -> tuple[MetaData, d
         Column("source_attributes", JSONB, nullable=False),
         Column("record_hash", String(64), nullable=False),
         Column("run_id", UUID(as_uuid=True), nullable=False),
+        # the last run whose source file still contained this parcel; older values mean it left the source
+        Column("last_seen_run_id", UUID(as_uuid=True), nullable=False),
         Column("first_seen_at", DateTime(timezone=True), nullable=False, server_default=text("now()")),
         Column("updated_at", DateTime(timezone=True), nullable=False, server_default=text("now()")),
         UniqueConstraint("canton", "nbident", "parcel_number", name=f"{table}_natural_key"),
@@ -88,6 +91,7 @@ def build(schema: str, table: str = "cadastre_switzerland") -> tuple[MetaData, d
         Column("unchanged", Integer, nullable=False, server_default="0"),
         Column("rejected", Integer, nullable=False, server_default="0"),
         Column("repaired", Integer, nullable=False, server_default="0"),
+        Column("not_in_source", Integer, nullable=False, server_default="0"),
         Column("details", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
     )
     rejected = Table(

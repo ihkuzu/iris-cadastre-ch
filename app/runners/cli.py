@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 import urllib.request
+import zipfile
 from pathlib import Path
 
 from loguru import logger
+from pyogrio.errors import DataLayerError, DataSourceError
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError, OperationalError
 
-from app.config.settings import Settings, get_settings
+from app.config.settings import ROOT, Settings, get_settings
 from app.config.sources import load_sources
+from app.database.guard import StagingGuardError
 from app.database.session import engine, prepare
 from app.extractors import av_file
 from app.loaders.parcels import load
@@ -43,23 +46,34 @@ def cmd_inspect(args, settings) -> int:
 
 
 def cmd_download(args, settings) -> int:
-    source = load_sources(settings.sources_file)[args.canton.upper()]
+    sources = load_sources(settings.sources_file)
+    if args.canton.upper() not in sources:
+        print(f"no source configured for {args.canton.upper()}; see {settings.sources_file}")
+        return 2
+    source = sources[args.canton.upper()]
     if not source.lawful:
         print(f"{source.canton}: access is {source.access!r}; download it yourself after accepting the terms")
         return 2
     target = settings.data_dir / "raw" / source.canton / (source.file or Path(source.url).name)
+    if target.exists() and not args.force:
+        # geodienste.ch allows one download per dataset and day, so a file we have is kept
+        print(f"{target} exists, sha256 {av_file.sha256(target)}; use --force to fetch it again")
+        return 0
     target.parent.mkdir(parents=True, exist_ok=True)
+    partial = target.with_name(target.name + ".part")
     print(f"downloading {source.url}\n         to {target}")
-    with urllib.request.urlopen(source.url, timeout=120) as res, open(target, "wb") as fh:
+    request = urllib.request.Request(source.url, headers={"User-Agent": "iris-cadastre-ch/0.1"})
+    with urllib.request.urlopen(request, timeout=120) as res, open(partial, "wb") as fh:
         while block := res.read(1 << 20):
             fh.write(block)
-    if target.read_bytes()[:2] != b"PK":
+    if not zipfile.is_zipfile(partial):
         # geodienste.ch answers some formats with an order page instead of the file
-        target.unlink()
+        partial.unlink()
         print("the server did not return a zip; order the GeoPackage on https://www.geodienste.ch/downloads/av,")
         print(f"then save it as {target} and run ingest again")
         return 2
-    print(f"sha256 {hashlib.sha256(target.read_bytes()).hexdigest()}")
+    partial.replace(target)
+    print(f"sha256 {av_file.sha256(target)}")
     return 0
 
 
@@ -110,19 +124,26 @@ def cmd_init(args, settings) -> int:
 
 def cmd_report(args, settings) -> int:
     data = quality.gather(engine(settings.database_url), settings.db_schema, settings.table)
-    quality.write(data, Path(args.out), Path(args.results), Path("docs/report_notes.md"))
+    quality.write(data, _root(args.out), _root(args.results), ROOT / "docs" / "report_notes.md")
     print(f"wrote {args.out} and {args.results}/")
     return 0
 
 
 def cmd_validate(args, settings) -> int:
-    sql = Path("sql/validation.sql").read_text(encoding="utf-8").replace("iris_staging.", f"{settings.db_schema}.")
+    sql = (ROOT / "sql" / "validation.sql").read_text(encoding="utf-8")
+    sql = sql.replace("iris_staging.cadastre_switzerland", f"{settings.db_schema}.{settings.table}")
+    sql = sql.replace("iris_staging.", f"{settings.db_schema}.")
     failed = 0
     with engine(settings.database_url).connect() as conn:
         for row in conn.execute(text(sql)):
             print(f"{'ok  ' if row.passed else 'FAIL'} {row.check_name}: {row.found}")
             failed += not row.passed
     return 1 if failed else 0
+
+
+def _root(value: str) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else ROOT / path
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -132,6 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("file")
     p = sub.add_parser("download", help="download a configured open source")
     p.add_argument("canton")
+    p.add_argument("--force", action="store_true", help="download again even if the file exists")
     p = sub.add_parser("ingest", help="read, check and load one canton")
     p.add_argument("canton")
     p.add_argument("--file", help="a file you downloaded yourself")
@@ -155,6 +177,9 @@ def main(argv: list[str] | None = None) -> int:
     }
     try:
         return handlers[args.cmd](args, settings)
-    except (FileNotFoundError, ValueError) as error:
+    except (FileNotFoundError, ValueError, KeyError, StagingGuardError, DataSourceError, DataLayerError) as error:
         logger.error("{}", error)
         return 2
+    except (IntegrityError, OperationalError) as error:
+        logger.error("database: {}", str(error.orig or error).splitlines()[0])
+        return 3
