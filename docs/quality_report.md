@@ -1,6 +1,9 @@
 # Quality report: Swiss cadastre (AV) ingestion
-Generated 2026-10-28T14:35:52+00:00 from the staging tables.
+
+Generated 2026-10-28T19:59:49+00:00 from the staging tables.
+
 ## Coverage by canton
+
 | canton | canton_name | parcels | municipalities | with_egrid | without_municipality | repaired | area_mismatch | area_km2 | dataset_date | source_crs | licence |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | AI | Appenzell Innerrhoden | 9143 | 5 | 9143 | 0 | 0 | 0 | 172.48 | 2026-10-28 | EPSG:2056 | Frei erhältlich, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms) |
@@ -9,6 +12,7 @@ Generated 2026-10-28T14:35:52+00:00 from the staging tables.
 | GE | Genève | 73111 | 45 | 73111 | 0 | 0 | 0 | 282.49 | 2026-10-03 | EPSG:2056 | Freie Nutzung, Quellenangabe Pflicht; SITG conditions d'utilisation |
 
 ## Integrity checks
+
 All checks pass.
 
 | invalid_geometries | wrong_srid | empty_geometries | duplicate_keys | egrids_on_two_parcels | wrong_country |
@@ -16,21 +20,33 @@ All checks pass.
 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 ## Rejected records (latest successful run per canton)
+
 | canton | reason | n | meaning |
 |---|---|---|---|
 | FR | conflicting_duplicate | 2 | same parcel key with different content, all copies held back |
 | FR | duplicate_egrid | 2 | same EGRID on different land register parcels in one file |
 
-## Runs
-| started | canton | source_file | sha256 | status | read | accepted | inserted | updated | unchanged | rejected | repaired |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| 2026-10-28 14:35 | AI | av_AI_gpkg_lv95.zip | a94e14aed24d | succeeded | 9143 | 9143 | 0 | 0 | 9143 | 0 | 0 |
-| 2026-10-28 14:34 | FR | av_FR_gpkg_lv95.zip | 7030dd266e39 | succeeded | 168520 | 168506 | 168506 | 0 | 0 | 4 | 0 |
-| 2026-10-28 14:32 | GE | av_GE_gpkg_lv95.zip | 2d79b08bccc7 | succeeded | 73111 | 73111 | 73111 | 0 | 0 | 0 | 0 |
-| 2026-10-28 14:31 | BS | av_BS_gpkg_lv95.zip | 5c9602a619d6 | succeeded | 24426 | 24426 | 24426 | 0 | 0 | 0 | 0 |
-| 2026-10-28 14:31 | AI | av_AI_gpkg_lv95.zip | a94e14aed24d | succeeded | 9143 | 9143 | 9143 | 0 | 0 | 0 | 0 |
+## Warnings (latest successful run per canton; rows are stored)
+
+| canton | warning | n | meaning |
+|---|---|---|---|
+| FR | area_differs_from_source | 17699 | computed area differs from Flaeche by more than the tolerance |
+| FR | egrid_shared_by_parts | 1605 | numbered part <article>.<nn> sharing the EGRID of its parcel |
+| FR | multipart_parcel | 4 | several polygons of one parcel merged into one MultiPolygon |
+
+## Runs (times in UTC)
+
+| started | canton | source_file | sha256 | status | read | accepted | inserted | updated | unchanged | rejected | merged | repaired | not_in_source |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-10-28 19:58 | FR | av_FR_gpkg_lv95.zip | 7030dd266e39 | succeeded | 168520 | 168506 | 0 | 0 | 168506 | 4 | 10 | 0 | 0 |
+| 2026-10-28 16:52 | FR | av_FR_gpkg_lv95.zip | 7030dd266e39 | succeeded | 168520 | 168506 | 0 | 0 | 168506 | 4 | 10 | 0 | 0 |
+| 2026-10-28 16:49 | FR | av_FR_gpkg_lv95.zip | 7030dd266e39 | succeeded | 168520 | 168506 | 168506 | 0 | 0 | 4 | 10 | 0 | 0 |
+| 2026-10-28 16:47 | GE | av_GE_gpkg_lv95.zip | 2d79b08bccc7 | succeeded | 73111 | 73111 | 73111 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2026-10-28 16:46 | BS | av_BS_gpkg_lv95.zip | 5c9602a619d6 | succeeded | 24426 | 24426 | 24426 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2026-10-28 16:46 | AI | av_AI_gpkg_lv95.zip | a94e14aed24d | succeeded | 9143 | 9143 | 9143 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 ## Sample rows
+
 | canton | bfs_nr | municipality | nbident | parcel_number | egrid | area_m2 | lon | lat |
 |---|---|---|---|---|---|---|---|---|
 | AI | 3102 | Gonten | AI02003102 | 412 | CH595977054157 | 12880.26 | 9.381817 | 47.341074 |
@@ -68,7 +84,7 @@ All checks pass.
 - Geometry is stored in LV95 (EPSG:2056) as delivered. Arcs are stroked into straight segments by
   GDAL when reading. `geom_wgs84` is a derived copy for web maps (pyproj, Swiss transformation
   without height); the LV95 column is the reference.
-- Areas are computed in LV95 in square metres. A difference to the stored `Flaechenmass` above
+- Areas are computed in LV95 in square metres. A difference to the stated area (`Flaeche`) above
   1 m² and 0.5 % is reported, not corrected: the stored value is the legal one.
 - Municipality: the BFS number is on every `resf` row; the name comes from the municipality
   boundary layer `mbsf` of the same export, by a point inside each parcel.
@@ -76,20 +92,25 @@ All checks pass.
   and is stored as one MultiPolygon with the summed area.
 - `source_dataset_date` is the layer's `last_change` in the GeoPackage, which is the export date
   of geodienste.ch, not the date of the last field survey.
+- Timestamps are stored in UTC; a source date or time without a zone is taken as UTC.
 - An unchanged parcel keeps the provenance (file, hash, run) of the run that last wrote it; a new
   run only updates `last_seen_run_id`. Parcels missing from a newer file are counted, not deleted.
 
 ## Findings from the real data (run of 2026-10-28)
 
 - 275,186 parcels from four cantons are in staging; every integrity check passes. AI, BS and GE
-  load without a single rejection, repair or area difference, and a second run of the same file
-  writes nothing (`inserted 0, updated 0, unchanged 9143` for AI).
-- Fribourg: 168,506 of 168,520 features are stored, 4 are held back (below).
+  load without a single rejection, repair or area difference. A second run of the same file
+  changes nothing (`inserted 0, updated 0, unchanged 168506` for FR, the largest canton).
+- Fribourg: 168,520 features = 168,506 stored rows + 4 held back (below) + 10 merged. The 10
+  are extra polygons of 4 parcels that the source splits into separate features with one key;
+  each of the 4 is stored once as a MultiPolygon (`multipart_parcel`, `merged_parts` in the run).
 - Fribourg delivers one land register parcel as numbered parts `<article>.<nn>` that share the
   parcel's EGRID: 1,605 parts, 2 to 11 per EGRID, always within one NBIdent and article number.
-  A first run rejected these as duplicate EGRIDs; the rule now accepts parts of the same article.
-- Fribourg: 2 features carry an EGRID that also belongs to a different article. They are held
-  back as `duplicate_egrid`, since an EGRID identifies exactly one parcel.
+  An earlier version of the rule rejected these as duplicate EGRIDs; FR is now configured with
+  `egrid_parts = true`, which accepts parts of the same article. Other cantons keep the strict rule.
+- Fribourg: EGRID `CH349410860776` is on two different parcels of `FR213812` (municipality 2138),
+  numbers `1356` (1,121 m²) and `1817` (430 m²). An EGRID identifies exactly one parcel, so both
+  features are held back as `duplicate_egrid` instead of picking one.
 - Fribourg: parcel `FR213812/1058a` comes twice, in municipalities 2138 and 2163, with different
   geometry and stated area (10,434 m² and 225,600 m²). Both copies are held back as
   `conflicting_duplicate` for a person to resolve; they are not guessed.
@@ -98,13 +119,17 @@ All checks pass.
   larger, on single polygons with or without holes. The stated area is the legal value of the
   land register and is often not recomputed from the survey geometry where an older survey was
   digitised, which is the likely cause. Both values are stored, the difference is reported and
-  nothing is corrected. `sql/examples.sql` (queries 7 to 9) lists them.
+  nothing is corrected. `sql/examples.sql` (queries 7 to 9) lists them; the output of the real
+  run is in `results/examples_output.txt`.
 - 225 Fribourg parcels have no EGRID; they are stored, the EGRID is optional in the model.
 - All parcels are `vollstaendig` and `rechtskraeftig`; the source has no incomplete or pending
   parcels in the `resf` layer.
 
 ## Known gaps
 
+- An update replaces the stored row (geometry and attributes); earlier versions are not kept in a
+  history table. Each run's file hash in `ingestion_runs` and the kept source files allow an
+  earlier state to be rebuilt.
 - Coverage is the configured cantons, not all of Switzerland. Cantons that require approval
   (JU, LU, NE, NW, OW, VD) are deliberately not ingested.
 - INTERLIS (.itf/.xtf) is not read directly; the GeoPackage export of the same data is used.

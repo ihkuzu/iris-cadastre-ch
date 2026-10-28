@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-28T14:35:52+00:00",
+  "generated": "2026-10-28T19:59:49+00:00",
   "by_canton": [
     {
       "canton": "AI",
@@ -60,53 +60,21 @@
   ],
   "runs": [
     {
-      "run_id": "4409e012-5946-421b-8418-f001e42b1501",
-      "canton": "AI",
-      "source_file": "av_AI_gpkg_lv95.zip",
-      "sha256": "a94e14aed24d",
-      "status": "succeeded",
-      "read": 9143,
-      "accepted": 9143,
-      "inserted": 0,
-      "updated": 0,
-      "unchanged": 9143,
-      "rejected": 0,
-      "repaired": 0,
-      "not_in_source": 0,
-      "started": "2026-10-28 14:35",
-      "details": {
-        "licence": "Frei erh\u00e4ltlich, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)",
-        "mapping": {
-          "egrid": "EGRIS_EGRID",
-          "bfs_nr": "BFSNr",
-          "canton": "Kanton",
-          "nbident": "NBIdent",
-          "validity": "Gueltigkeit",
-          "completeness": "Vollstaendigkeit",
-          "parcel_number": "Nummer",
-          "area_source_m2": "Flaeche"
-        },
-        "reasons": {},
-        "warnings": {},
-        "source_crs": "EPSG:2056",
-        "dataset_date": "2026-10-28"
-      }
-    },
-    {
-      "run_id": "c82f7562-23d0-4b9c-afcd-1b2631d0927b",
+      "run_id": "17b96676-a215-40c5-bb78-78af61984cb0",
       "canton": "FR",
       "source_file": "av_FR_gpkg_lv95.zip",
       "sha256": "7030dd266e39",
       "status": "succeeded",
       "read": 168520,
       "accepted": 168506,
-      "inserted": 168506,
+      "inserted": 0,
       "updated": 0,
-      "unchanged": 0,
+      "unchanged": 168506,
       "rejected": 4,
       "repaired": 0,
       "not_in_source": 0,
-      "started": "2026-10-28 14:34",
+      "merged": 10,
+      "started": "2026-10-28 19:58",
       "details": {
         "licence": "Freie Nutzung, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)",
         "mapping": {
@@ -126,14 +94,100 @@
         "warnings": {
           "multipart_parcel": 4,
           "egrid_shared_by_parts": 1605,
-          "area_differs_from_source": 17716
+          "area_differs_from_source": 17699
         },
         "source_crs": "EPSG:2056",
-        "dataset_date": "2026-10-28"
+        "dataset_date": "2026-10-28",
+        "merged_parts": 10,
+        "stale_rejected": 0
       }
     },
     {
-      "run_id": "1a330203-d63c-48ab-8517-e34e0ed67ec0",
+      "run_id": "ae6b010e-ce50-474d-88dc-cffd4d5b6d6a",
+      "canton": "FR",
+      "source_file": "av_FR_gpkg_lv95.zip",
+      "sha256": "7030dd266e39",
+      "status": "succeeded",
+      "read": 168520,
+      "accepted": 168506,
+      "inserted": 0,
+      "updated": 0,
+      "unchanged": 168506,
+      "rejected": 4,
+      "repaired": 0,
+      "not_in_source": 0,
+      "merged": 10,
+      "started": "2026-10-28 16:52",
+      "details": {
+        "licence": "Freie Nutzung, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)",
+        "mapping": {
+          "egrid": "EGRIS_EGRID",
+          "bfs_nr": "BFSNr",
+          "canton": "Kanton",
+          "nbident": "NBIdent",
+          "validity": "Gueltigkeit",
+          "completeness": "Vollstaendigkeit",
+          "parcel_number": "Nummer",
+          "area_source_m2": "Flaeche"
+        },
+        "reasons": {
+          "duplicate_egrid": 2,
+          "conflicting_duplicate": 2
+        },
+        "warnings": {
+          "multipart_parcel": 4,
+          "egrid_shared_by_parts": 1605,
+          "area_differs_from_source": 17704
+        },
+        "source_crs": "EPSG:2056",
+        "dataset_date": "2026-10-28",
+        "merged_parts": 10
+      }
+    },
+    {
+      "run_id": "61d718a1-b238-44d4-95a5-0bfabd6e7c04",
+      "canton": "FR",
+      "source_file": "av_FR_gpkg_lv95.zip",
+      "sha256": "7030dd266e39",
+      "status": "succeeded",
+      "read": 168520,
+      "accepted": 168506,
+      "inserted": 168506,
+      "updated": 0,
+      "unchanged": 0,
+      "rejected": 4,
+      "repaired": 0,
+      "not_in_source": 0,
+      "merged": 10,
+      "started": "2026-10-28 16:49",
+      "details": {
+        "licence": "Freie Nutzung, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)",
+        "mapping": {
+          "egrid": "EGRIS_EGRID",
+          "bfs_nr": "BFSNr",
+          "canton": "Kanton",
+          "nbident": "NBIdent",
+          "validity": "Gueltigkeit",
+          "completeness": "Vollstaendigkeit",
+          "parcel_number": "Nummer",
+          "area_source_m2": "Flaeche"
+        },
+        "reasons": {
+          "duplicate_egrid": 2,
+          "conflicting_duplicate": 2
+        },
+        "warnings": {
+          "multipart_parcel": 4,
+          "egrid_shared_by_parts": 1605,
+          "area_differs_from_source": 17704
+        },
+        "source_crs": "EPSG:2056",
+        "dataset_date": "2026-10-28",
+        "merged_parts": 10
+      }
+    },
+    {
+      "run_id": "48f71399-4b40-4d58-b927-17879d218183",
       "canton": "GE",
       "source_file": "av_GE_gpkg_lv95.zip",
       "sha256": "2d79b08bccc7",
@@ -146,7 +200,8 @@
       "rejected": 0,
       "repaired": 0,
       "not_in_source": 0,
-      "started": "2026-10-28 14:32",
+      "merged": 0,
+      "started": "2026-10-28 16:47",
       "details": {
         "licence": "Freie Nutzung, Quellenangabe Pflicht; SITG conditions d'utilisation",
         "mapping": {
@@ -162,11 +217,12 @@
         "reasons": {},
         "warnings": {},
         "source_crs": "EPSG:2056",
-        "dataset_date": "2026-10-03"
+        "dataset_date": "2026-10-03",
+        "merged_parts": 0
       }
     },
     {
-      "run_id": "381cc79d-7884-4840-9093-791eb2ab845d",
+      "run_id": "af50c948-7814-4c51-9e23-e5fa660186e0",
       "canton": "BS",
       "source_file": "av_BS_gpkg_lv95.zip",
       "sha256": "5c9602a619d6",
@@ -179,7 +235,8 @@
       "rejected": 0,
       "repaired": 0,
       "not_in_source": 0,
-      "started": "2026-10-28 14:31",
+      "merged": 0,
+      "started": "2026-10-28 16:46",
       "details": {
         "licence": "Frei erh\u00e4ltlich, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)",
         "mapping": {
@@ -195,11 +252,12 @@
         "reasons": {},
         "warnings": {},
         "source_crs": "EPSG:2056",
-        "dataset_date": "2026-10-24"
+        "dataset_date": "2026-10-24",
+        "merged_parts": 0
       }
     },
     {
-      "run_id": "6475139f-3c51-49be-85a5-44405bd0b8d5",
+      "run_id": "28116744-cca7-4066-b0ec-9b3d8f5d7465",
       "canton": "AI",
       "source_file": "av_AI_gpkg_lv95.zip",
       "sha256": "a94e14aed24d",
@@ -212,7 +270,8 @@
       "rejected": 0,
       "repaired": 0,
       "not_in_source": 0,
-      "started": "2026-10-28 14:31",
+      "merged": 0,
+      "started": "2026-10-28 16:46",
       "details": {
         "licence": "Frei erh\u00e4ltlich, Quellenangabe Pflicht (geodienste.ch terms of use and cantonal terms)",
         "mapping": {
@@ -228,7 +287,8 @@
         "reasons": {},
         "warnings": {},
         "source_crs": "EPSG:2056",
-        "dataset_date": "2026-10-28"
+        "dataset_date": "2026-10-28",
+        "merged_parts": 0
       }
     }
   ],
@@ -242,6 +302,23 @@
       "canton": "FR",
       "reason": "duplicate_egrid",
       "n": 2
+    }
+  ],
+  "warnings": [
+    {
+      "canton": "FR",
+      "warning": "area_differs_from_source",
+      "n": 17699
+    },
+    {
+      "canton": "FR",
+      "warning": "egrid_shared_by_parts",
+      "n": 1605
+    },
+    {
+      "canton": "FR",
+      "warning": "multipart_parcel",
+      "n": 4
     }
   ],
   "checks": [

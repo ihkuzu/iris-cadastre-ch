@@ -1,0 +1,92 @@
+Pager usage is off.
+CREATE VIEW
+1. Parcels and area per canton and municipality (top 10 by parcels)
+ canton | bfs_nr | municipality  | parcels |  km2  
+--------+--------+---------------+---------+-------
+ BS     |   2701 | Basel         |   18548 | 23.86
+ GE     |   6621 | Genève        |   10299 | 18.30
+ FR     |   2054 | Estavayer     |    5549 | 68.48
+ FR     |   2275 | Murten        |    5148 | 39.56
+ BS     |   2703 | Riehen        |    5124 | 10.87
+ FR     |   2236 | Gibloux       |    4915 | 36.27
+ FR     |   2306 | Tafers        |    4865 | 41.35
+ FR     |   2053 | Belmont-Broye |    4515 | 25.77
+ FR     |   2121 | Haut-Intyamon |    4226 | 60.29
+ FR     |   2125 | Bulle         |    4179 | 23.85
+(10 rows)
+
+2. The parcel under a point (Basel Münster, WGS84)
+ canton | municipality |   nbident    | parcel_number |     egrid      | area_m2 
+--------+--------------+--------------+---------------+----------------+---------
+ BS     | Basel        | BSS500000000 | 0025          | CH467089670273 | 5297.55
+(1 row)
+
+3. Rejected because one EGRID sits on several parcel keys: how many keys per EGRID
+ copies | egrids 
+--------+--------
+      2 |      1
+(1 row)
+
+4. Examples of such EGRIDs with their keys, municipality and attributes
+     egrid      |                                                            keys                                                            
+----------------+----------------------------------------------------------------------------------------------------------------------------
+ CH349410860776 | FR213812 1356 bfs 2138 rechtskraeftig vollstaendig area 1121 | FR213812 1817 bfs 2138 rechtskraeftig vollstaendig area 430
+(1 row)
+
+5. Do the rejected EGRID copies share NBIdent, number or municipality?
+ egrids | same_nbident | same_number | same_municipality 
+--------+--------------+-------------+-------------------
+      1 |            1 |           0 |                 1
+(1 row)
+
+6. Same parcel key with different content
+      detail       | source_feature_id |                     attributes                     | wkt_area 
+-------------------+-------------------+----------------------------------------------------+----------
+ FR/FR213812/1058a | 3228087975        | bfs 2163 CH169810945593 rechtskraeftig area 10434  |  10433.8
+ FR/FR213812/1058a | 3228149116        | bfs 2138 CH169810945593 rechtskraeftig area 225600 | 227424.5
+(2 rows)
+
+7. Computed area against the stated area (Flaeche), per canton
+ canton | parcels | mismatch | stated_whole_m2 | median_diff_m2 
+--------+---------+----------+-----------------+----------------
+ AI     |    9143 |        0 |            9143 |           0.25
+ BS     |   24426 |        0 |           24426 |           0.25
+ FR     |  168506 |    17699 |          168506 |           0.37
+ GE     |   73111 |        0 |           73111 |           0.25
+(4 rows)
+
+8. Mismatches by size of the difference
+ canton |  difference   | parcels | stated_larger | multipart | not_complete 
+--------+---------------+---------+---------------+-----------+--------------
+ FR     | a) up to 5 %  |   14709 |          6629 |         0 |            0
+ FR     | b) 5-50 %     |    2719 |          1119 |         1 |            0
+ FR     | c) 50-200 %   |     235 |            68 |         0 |            0
+ FR     | d) over 200 % |      36 |             0 |         0 |            0
+(4 rows)
+
+9. Examples of large mismatches
+ canton | bfs_nr | nbident  | parcel_number |  area_m2   | area_source_m2 | completeness |    validity    | parts | holes 
+--------+--------+----------+---------------+------------+----------------+--------------+----------------+-------+-------
+ FR     |   2163 | FR212712 | 458           | 1153145.72 |     1040312.00 | vollstaendig | rechtskraeftig |     1 |     0
+ FR     |   2138 | FR213812 | 866a          |  126389.68 |       35498.00 | vollstaendig | rechtskraeftig |     1 |     1
+ FR     |   2138 | FR213812 | 620           |   97934.73 |       15048.00 | vollstaendig | rechtskraeftig |     1 |     1
+ FR     |   2138 | FR213812 | 618           |  199542.49 |      280710.00 | vollstaendig | rechtskraeftig |     1 |     2
+ FR     |   2138 | FR213812 | 755a          |  190450.05 |      112711.00 | vollstaendig | rechtskraeftig |     1 |     0
+ FR     |   2163 | FR212712 | 1199          |  318136.09 |      249871.00 | vollstaendig | rechtskraeftig |     1 |     2
+ FR     |   2163 | FR212712 | 648           |  792329.54 |      855369.00 | vollstaendig | rechtskraeftig |     1 |     0
+ FR     |   2163 | FR212712 | 919           |   88606.66 |       34011.00 | vollstaendig | rechtskraeftig |     1 |     2
+ FR     |   2299 | FR229912 | 889a          |  341179.02 |      288439.00 | vollstaendig | rechtskraeftig |     1 |     0
+ FR     |   2138 | FR213812 | 1362          |   71397.10 |       18760.00 | vollstaendig | rechtskraeftig |     1 |     0
+ FR     |   2163 | FR212712 | 1675          |  303931.73 |      355779.00 | vollstaendig | rechtskraeftig |     1 |     1
+ FR     |   2163 | FR212712 | 915           |  132296.48 |      182700.00 | vollstaendig | rechtskraeftig |     1 |     1
+(12 rows)
+
+10. Values of completeness and validity per canton
+ canton | completeness |    validity    | count  
+--------+--------------+----------------+--------
+ AI     | vollstaendig | rechtskraeftig |   9143
+ BS     | vollstaendig | rechtskraeftig |  24426
+ FR     | vollstaendig | rechtskraeftig | 168506
+ GE     | vollstaendig | rechtskraeftig |  73111
+(4 rows)
+
